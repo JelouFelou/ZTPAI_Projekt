@@ -8,7 +8,7 @@ Aplikacja ma umożliwiać przeglądanie katalogu gier, sprawdzanie dostępności
 
 ## Status
 
-Repozytorium i backend NestJS. Kolejne elementy aplikacji będą dodawane etapami zgodnie z planem projektu.
+Repozytorium, backend NestJS i szkielet frontendu React. Kolejne elementy aplikacji będą dodawane etapami zgodnie z planem projektu.
 
 ## Backend
 
@@ -18,3 +18,12 @@ npm run start:dev
 ```
 
 Domyślnie API uruchamia się pod adresem `http://localhost:3000`.
+
+## Frontend
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Vite wypisze adres lokalnej aplikacji w terminalu.
