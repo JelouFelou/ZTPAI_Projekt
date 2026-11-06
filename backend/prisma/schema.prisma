@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum CopyStatus {
+  AVAILABLE
+  MAINTENANCE
+  RETIRED
+}
+
+enum LoanStatus {
+  ACTIVE
+  RETURNED
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique @db.VarChar(320)
+  passwordHash String   @map("password_hash")
+  firstName    String   @map("first_name") @db.VarChar(100)
+  lastName     String   @map("last_name") @db.VarChar(100)
+  role         UserRole @default(USER)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  loans        Loan[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  games       Game[]
+
+  @@map("categories")
+}
+
+model Game {
+  id              String     @id @default(uuid()) @db.Uuid
+  title           String     @db.VarChar(200)
+  description     String?
+  minPlayers      Int        @map("min_players")
+  maxPlayers      Int        @map("max_players")
+  recommendedAge  Int        @map("recommended_age")
+  durationMinutes Int        @map("duration_minutes")
+  categoryId      String     @map("category_id") @db.Uuid
+  category        Category   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  copies          GameCopy[]
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([categoryId])
+  @@index([title])
+  @@map("games")
+}
+
+model GameCopy {
+  id            String     @id @default(uuid()) @db.Uuid
+  inventoryCode String     @unique @map("inventory_code") @db.VarChar(64)
+  status        CopyStatus @default(AVAILABLE)
+  gameId        String     @map("game_id") @db.Uuid
+  game          Game       @relation(fields: [gameId], references: [id], onDelete: Restrict)
+  loans         Loan[]
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([gameId, status])
+  @@map("game_copies")
+}
+
+model Loan {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String     @map("user_id") @db.Uuid
+  gameCopyId String     @map("game_copy_id") @db.Uuid
+  status     LoanStatus @default(ACTIVE)
+  borrowedAt DateTime   @default(now()) @map("borrowed_at") @db.Timestamptz(3)
+  dueAt      DateTime   @map("due_at") @db.Timestamptz(3)
+  returnedAt DateTime?  @map("returned_at") @db.Timestamptz(3)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  gameCopy   GameCopy   @relation(fields: [gameCopyId], references: [id], onDelete: Restrict)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([userId, status])
+  @@index([gameCopyId, status])
+  @@map("loans")
+}

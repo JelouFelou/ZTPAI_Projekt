@@ -8,16 +8,22 @@ Aplikacja ma umożliwiać przeglądanie katalogu gier, sprawdzanie dostępności
 
 ## Status
 
-Repozytorium, backend NestJS i szkielet frontendu React. Kolejne elementy aplikacji będą dodawane etapami zgodnie z planem projektu.
+Repozytorium, backend NestJS, frontend React oraz początkowy schemat bazy PostgreSQL zarządzany przez Prisma. Kolejne elementy aplikacji będą dodawane etapami zgodnie z planem projektu.
 
 ## Backend
 
+Przed uruchomieniem API przygotuj lokalną bazę:
+
 ```powershell
+Copy-Item backend/.env.example backend/.env
+docker compose up -d db
 cd backend
+npm run db:generate
+npm run db:migrate
 npm run start:dev
 ```
 
-Domyślnie API uruchamia się pod adresem `http://localhost:3000`.
+Domyślnie API uruchamia się pod adresem `http://localhost:3000`. `.env.example` zawiera dane wyłącznie do lokalnego developmentu; nie używaj ich w środowisku produkcyjnym.
 
 ## Frontend
 
