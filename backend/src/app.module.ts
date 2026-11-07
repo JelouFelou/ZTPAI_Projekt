@@ -3,6 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { CategoriesModule } from './categories/categories.module.js';
+import { GamesModule } from './games/games.module.js';
+import { GameCopiesModule } from './game-copies/game-copies.module.js';
 
 @Module({
   imports: [
@@ -11,6 +14,9 @@ import { PrismaModule } from './prisma/prisma.module.js';
       envFilePath: '.env',
     }),
     PrismaModule,
+    CategoriesModule,
+    GamesModule,
+    GameCopiesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

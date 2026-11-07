@@ -42,3 +42,13 @@ API domyślnie nasłuchuje na porcie `3000`. Port można zmienić zmienną środ
 - `prisma/schema.prisma` — schemat danych
 - `prisma/migrations/` — migracje PostgreSQL
 - `test/` — testy end-to-end
+
+## API katalogu
+
+Wszystkie endpointy są dostępne pod prefiksem `/api`:
+
+- `/api/categories` — `GET`, `POST`, `GET /:id`, `PATCH /:id`, `DELETE /:id`
+- `/api/games` — `GET`, `POST`, `GET /:id`, `PATCH /:id`, `DELETE /:id`
+- `/api/game-copies` — `GET`, `POST`, `GET /:id`, `PATCH /:id`, `DELETE /:id`
+
+Żądania z body są walidowane. ID w ścieżkach muszą być UUID. Usunięcie zasobu używanego przez inne rekordy zwraca `409 Conflict`. Endpointy nie mają jeszcze ochrony rolami; uwierzytelnianie i autoryzacja są osobnym etapem planu.
