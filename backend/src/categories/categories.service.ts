@@ -3,13 +3,16 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { rethrowPrismaError } from '../common/prisma-errors.js';
 import { CreateCategoryDto } from './dto/create-category.dto.js';
 import { UpdateCategoryDto } from './dto/update-category.dto.js';
+import { toCategoryResponse } from './category.mapper.js';
 
 @Injectable()
 export class CategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
   findAll() {
-    return this.prisma.category.findMany({ orderBy: { name: 'asc' } });
+    return this.prisma.category
+      .findMany({ orderBy: { name: 'asc' } })
+      .then((categories) => categories.map(toCategoryResponse));
   }
 
   async findOne(id: string) {
@@ -19,12 +22,13 @@ export class CategoriesService {
       throw new NotFoundException('Category not found');
     }
 
-    return category;
+    return toCategoryResponse(category);
   }
 
   async create(dto: CreateCategoryDto) {
     try {
-      return await this.prisma.category.create({ data: dto });
+      const category = await this.prisma.category.create({ data: dto });
+      return toCategoryResponse(category);
     } catch (error) {
       rethrowPrismaError(error);
     }
@@ -32,7 +36,11 @@ export class CategoriesService {
 
   async update(id: string, dto: UpdateCategoryDto) {
     try {
-      return await this.prisma.category.update({ where: { id }, data: dto });
+      const category = await this.prisma.category.update({
+        where: { id },
+        data: dto,
+      });
+      return toCategoryResponse(category);
     } catch (error) {
       rethrowPrismaError(error);
     }

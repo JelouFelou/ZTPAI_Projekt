@@ -1,8 +1,16 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { rethrowPrismaError } from '../common/prisma-errors.js';
 import { CreateGameDto } from './dto/create-game.dto.js';
 import { UpdateGameDto } from './dto/update-game.dto.js';
+import { ListGamesQueryDto } from './dto/list-games-query.dto.js';
+import { toGameResponse } from './game.mapper.js';
+import type { GameListResponseDto } from './dto/game-response.dto.js';
 
 const gameResponse = { category: true } as const;
 
@@ -10,11 +18,39 @@ const gameResponse = { category: true } as const;
 export class GamesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll() {
-    return this.prisma.game.findMany({
-      include: gameResponse,
-      orderBy: { title: 'asc' },
-    });
+  async findAll(query: ListGamesQueryDto): Promise<GameListResponseDto> {
+    const where: Prisma.GameWhereInput = {
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(query.q
+        ? {
+            OR: [
+              { title: { contains: query.q, mode: 'insensitive' } },
+              { description: { contains: query.q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+    const skip = (query.page - 1) * query.limit;
+    const [games, total] = await this.prisma.$transaction([
+      this.prisma.game.findMany({
+        where,
+        include: gameResponse,
+        orderBy: [{ title: 'asc' }, { id: 'asc' }],
+        skip,
+        take: query.limit,
+      }),
+      this.prisma.game.count({ where }),
+    ]);
+
+    return {
+      data: games.map(toGameResponse),
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        totalPages: Math.ceil(total / query.limit),
+      },
+    };
   }
 
   async findOne(id: string) {
@@ -27,7 +63,7 @@ export class GamesService {
       throw new NotFoundException('Game not found');
     }
 
-    return game;
+    return toGameResponse(game);
   }
 
   async create(dto: CreateGameDto) {
@@ -35,10 +71,11 @@ export class GamesService {
     await this.ensureCategoryExists(dto.categoryId);
 
     try {
-      return await this.prisma.game.create({
+      const game = await this.prisma.game.create({
         data: dto,
         include: gameResponse,
       });
+      return toGameResponse(game);
     } catch (error) {
       rethrowPrismaError(error);
     }
@@ -63,11 +100,12 @@ export class GamesService {
     }
 
     try {
-      return await this.prisma.game.update({
+      const game = await this.prisma.game.update({
         where: { id },
         data: dto,
         include: gameResponse,
       });
+      return toGameResponse(game);
     } catch (error) {
       rethrowPrismaError(error);
     }
@@ -83,9 +121,7 @@ export class GamesService {
 
   private validatePlayerRange(minPlayers: number, maxPlayers: number): void {
     if (minPlayers > maxPlayers) {
-      throw new BadRequestException(
-        'minPlayers must not exceed maxPlayers',
-      );
+      throw new BadRequestException('minPlayers must not exceed maxPlayers');
     }
   }
 

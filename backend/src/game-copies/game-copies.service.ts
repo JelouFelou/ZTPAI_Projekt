@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { rethrowPrismaError } from '../common/prisma-errors.js';
 import { CreateGameCopyDto } from './dto/create-game-copy.dto.js';
 import { UpdateGameCopyDto } from './dto/update-game-copy.dto.js';
+import { toGameCopyResponse } from './game-copy.mapper.js';
 
 const copyResponse = {
   game: { select: { id: true, title: true } },
@@ -13,10 +14,12 @@ export class GameCopiesService {
   constructor(private readonly prisma: PrismaService) {}
 
   findAll() {
-    return this.prisma.gameCopy.findMany({
-      include: copyResponse,
-      orderBy: { inventoryCode: 'asc' },
-    });
+    return this.prisma.gameCopy
+      .findMany({
+        include: copyResponse,
+        orderBy: { inventoryCode: 'asc' },
+      })
+      .then((copies) => copies.map(toGameCopyResponse));
   }
 
   async findOne(id: string) {
@@ -29,17 +32,18 @@ export class GameCopiesService {
       throw new NotFoundException('Game copy not found');
     }
 
-    return copy;
+    return toGameCopyResponse(copy);
   }
 
   async create(dto: CreateGameCopyDto) {
     await this.ensureGameExists(dto.gameId);
 
     try {
-      return await this.prisma.gameCopy.create({
+      const copy = await this.prisma.gameCopy.create({
         data: dto,
         include: copyResponse,
       });
+      return toGameCopyResponse(copy);
     } catch (error) {
       rethrowPrismaError(error);
     }
@@ -60,11 +64,12 @@ export class GameCopiesService {
     }
 
     try {
-      return await this.prisma.gameCopy.update({
+      const copy = await this.prisma.gameCopy.update({
         where: { id },
         data: dto,
         include: copyResponse,
       });
+      return toGameCopyResponse(copy);
     } catch (error) {
       rethrowPrismaError(error);
     }

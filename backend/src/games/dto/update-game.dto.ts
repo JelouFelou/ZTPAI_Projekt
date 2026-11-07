@@ -1,4 +1,6 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { PartialType } from '@nestjs/swagger';
 import { CreateGameDto } from './create-game.dto.js';
 
-export class UpdateGameDto extends PartialType(CreateGameDto) {}
+export class UpdateGameDto extends PartialType(CreateGameDto, {
+  skipNullProperties: false,
+}) {}

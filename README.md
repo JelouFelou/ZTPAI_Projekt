@@ -33,6 +33,10 @@ Podstawowe endpointy katalogu:
 
 Każdy zasób obsługuje `GET` listy i szczegółu, `POST`, `PATCH` oraz `DELETE`. Uwierzytelnianie i ograniczenia dostępu będą dodane w późniejszym etapie.
 
+Listę gier można wyszukiwać i filtrować, np. `GET /api/games?q=catan&categoryId=<uuid>&page=1&limit=20`. Odpowiedź zawiera `data` i metadane paginacji. Dokumentacja OpenAPI/Swagger jest dostępna pod `/api/docs`.
+
+Błędy API mają wspólny format `{ "error": { "code", "message", "details?", "requestId" } }`. Identyfikator żądania jest zwracany także w nagłówku `X-Request-Id`.
+
 ## Frontend
 
 ```powershell
