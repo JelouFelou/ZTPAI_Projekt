@@ -1,15 +1,30 @@
 import { INestApplication, Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
+import * as argon2 from 'argon2';
 import { afterEach, vi } from 'vitest';
 import { AppModule } from './../src/app.module.js';
 import { PrismaService } from './../src/prisma/prisma.service.js';
 import { configureApi } from './../src/common/api-setup.js';
 
+const testJwtSecret = 'test-only-jwt-secret-with-at-least-32-bytes';
+const validPassword = 'correct-horse-battery-staple';
 const categoryId = '497f6eca-6276-4993-bfeb-53cbbbba6f08';
 const gameId = '89a919d8-6c8c-4faa-a6d1-1b374a284846';
 const copyId = '6b2e88e9-2f21-4abe-8a83-0b550fb23884';
+const userId = '78eaf4f5-f82d-462a-9b1d-7887b12450dc';
+const user = {
+  id: userId,
+  email: 'ada@example.com',
+  passwordHash: '',
+  firstName: 'Ada',
+  lastName: 'Lovelace',
+  role: 'USER',
+  createdAt: new Date('2026-01-01T10:00:00.000Z'),
+  updatedAt: new Date('2026-01-02T10:00:00.000Z'),
+};
 
 const category = {
   id: categoryId,
@@ -78,17 +93,31 @@ function createPrismaMock() {
     category: createDelegate(),
     game: createDelegate(),
     gameCopy: createDelegate(),
+    user: createDelegate(),
     $transaction: vi.fn((operations: readonly Promise<unknown>[]) =>
       Promise.all(operations),
     ),
   };
 }
 
+async function createAccessToken(
+  app: INestApplication,
+  role: 'USER' | 'ADMIN',
+) {
+  return app.get(JwtService).signAsync({
+    sub: userId,
+    email: user.email,
+    role,
+  });
+}
+
 describe('BoardRent API (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: ReturnType<typeof createPrismaMock>;
+  const originalJwtSecret = process.env.AUTH_JWT_SECRET;
 
   beforeEach(async () => {
+    process.env.AUTH_JWT_SECRET = testJwtSecret;
     prisma = createPrismaMock();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -105,6 +134,11 @@ describe('BoardRent API (e2e)', () => {
 
   afterEach(async () => {
     await app.close();
+    if (originalJwtSecret === undefined) {
+      delete process.env.AUTH_JWT_SECRET;
+    } else {
+      process.env.AUTH_JWT_SECRET = originalJwtSecret;
+    }
     vi.restoreAllMocks();
   });
 
@@ -117,7 +151,188 @@ describe('BoardRent API (e2e)', () => {
       .expect('Hello World!');
   });
 
+  it('registers a normalized member account with an Argon2id password hash', async () => {
+    prisma.user.create.mockResolvedValue({
+      ...user,
+      email: 'ada@example.com',
+      passwordHash: '$argon2id$stored-hash',
+    });
+
+    const response = await request(app.getHttpServer())
+      .post('/api/auth/register')
+      .send({
+        email: ' Ada@Example.com ',
+        password: validPassword,
+        firstName: ' Ada ',
+        lastName: ' Lovelace ',
+      })
+      .expect(201);
+
+    expect(response.body).toEqual({
+      id: userId,
+      email: 'ada@example.com',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      role: 'USER',
+      createdAt: user.createdAt.toISOString(),
+    });
+    expect(response.body).not.toHaveProperty('password');
+    expect(response.body).not.toHaveProperty('passwordHash');
+
+    const [createArgs] = prisma.user.create.mock.calls[0] ?? [];
+    expect(createArgs.data).toMatchObject({
+      email: 'ada@example.com',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      role: 'USER',
+    });
+    expect(createArgs.data.passwordHash).toMatch(/^\$argon2id\$/);
+    expect(createArgs.data.passwordHash).not.toBe(validPassword);
+  });
+
+  it('rejects duplicate registration emails with 409', async () => {
+    const { Prisma } = await import('@prisma/client');
+    prisma.user.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.19.0',
+        meta: { target: ['email'] },
+      }),
+    );
+
+    const response = await request(app.getHttpServer())
+      .post('/api/auth/register')
+      .send({
+        email: 'ada@example.com',
+        password: validPassword,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+      })
+      .expect(409);
+
+    expect(response.body.error.code).toBe('CONFLICT');
+  });
+
+  it('rejects invalid registration data and client-supplied roles', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/auth/register')
+      .send({
+        email: 'not-an-email',
+        password: 'short',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        role: 'ADMIN',
+      })
+      .expect(400);
+
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('logs in and verifies a signed JWT access token', async () => {
+    const passwordHash = await argon2.hash(validPassword, {
+      type: argon2.argon2id,
+    });
+    prisma.user.findUnique.mockResolvedValue({ ...user, passwordHash });
+
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: 'ADA@example.com', password: validPassword })
+      .expect(200);
+
+    expect(loginResponse.body).toMatchObject({
+      tokenType: 'Bearer',
+      expiresIn: 900,
+      user: {
+        id: userId,
+        email: user.email,
+        role: 'USER',
+      },
+    });
+    expect(loginResponse.body.accessToken).toEqual(expect.any(String));
+    expect(loginResponse.body.user).not.toHaveProperty('passwordHash');
+
+    await request(app.getHttpServer())
+      .get('/api/auth/verify')
+      .set('Authorization', `Bearer ${loginResponse.body.accessToken}`)
+      .expect(200)
+      .expect({ valid: true, userId });
+  });
+
+  it('rejects invalid credentials and missing or invalid access tokens', async () => {
+    const passwordHash = await argon2.hash(validPassword, {
+      type: argon2.argon2id,
+    });
+    prisma.user.findUnique
+      .mockResolvedValueOnce({ ...user, passwordHash })
+      .mockResolvedValueOnce(null);
+
+    await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: user.email, password: 'incorrect-password' })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: 'missing@example.com', password: validPassword })
+      .expect(401);
+    await request(app.getHttpServer()).get('/api/auth/verify').expect(401);
+    await request(app.getHttpServer())
+      .get('/api/auth/verify')
+      .set('Authorization', 'Bearer invalid-token')
+      .expect(401);
+  });
+
+  it('requires an ADMIN token for every catalog mutation', async () => {
+    const writes = [
+      () => request(app.getHttpServer()).post('/api/categories').send({}),
+      () =>
+        request(app.getHttpServer())
+          .patch(`/api/categories/${categoryId}`)
+          .send({}),
+      () =>
+        request(app.getHttpServer()).delete(`/api/categories/${categoryId}`),
+      () => request(app.getHttpServer()).post('/api/games').send({}),
+      () => request(app.getHttpServer()).patch(`/api/games/${gameId}`).send({}),
+      () => request(app.getHttpServer()).delete(`/api/games/${gameId}`),
+      () => request(app.getHttpServer()).post('/api/game-copies').send({}),
+      () =>
+        request(app.getHttpServer())
+          .patch(`/api/game-copies/${copyId}`)
+          .send({}),
+      () => request(app.getHttpServer()).delete(`/api/game-copies/${copyId}`),
+    ];
+
+    for (const write of writes) {
+      await write().expect(401);
+    }
+
+    prisma.user.findUnique.mockResolvedValue(user);
+    const userToken = await createAccessToken(app, 'USER');
+    for (const write of [
+      () => request(app.getHttpServer()).post('/api/categories').send({}),
+      () => request(app.getHttpServer()).post('/api/games').send({}),
+      () => request(app.getHttpServer()).post('/api/game-copies').send({}),
+    ]) {
+      await write().set('Authorization', `Bearer ${userToken}`).expect(403);
+    }
+  });
+
+  it('rejects an ADMIN token when the account role has since changed', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    const adminToken = await createAccessToken(app, 'ADMIN');
+
+    await request(app.getHttpServer())
+      .post('/api/categories')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Strategiczne' })
+      .expect(401);
+
+    expect(prisma.category.create).not.toHaveBeenCalled();
+  });
+
   it('supports category CRUD', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    const adminToken = await createAccessToken(app, 'ADMIN');
     prisma.category.findMany.mockResolvedValue([category]);
     prisma.category.findUnique.mockResolvedValue(category);
     prisma.category.create.mockResolvedValue(category);
@@ -130,6 +345,7 @@ describe('BoardRent API (e2e)', () => {
       .expect([categoryResponse]);
     await request(app.getHttpServer())
       .post('/api/categories')
+      .set('Authorization', `Bearer ${adminToken}`)
       .send({ name: '  Strategiczne  ' })
       .expect(201)
       .expect(categoryResponse);
@@ -139,11 +355,13 @@ describe('BoardRent API (e2e)', () => {
       .expect(categoryResponse);
     await request(app.getHttpServer())
       .patch(`/api/categories/${categoryId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .send({ description: 'Gry strategiczne' })
       .expect(200)
       .expect(categoryResponse);
     await request(app.getHttpServer())
       .delete(`/api/categories/${categoryId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(204);
 
     expect(prisma.category.create).toHaveBeenCalledWith({
@@ -152,8 +370,11 @@ describe('BoardRent API (e2e)', () => {
   });
 
   it('rejects invalid category input and unknown fields', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    const adminToken = await createAccessToken(app, 'ADMIN');
     const response = await request(app.getHttpServer())
       .post('/api/categories')
+      .set('Authorization', `Bearer ${adminToken}`)
       .send({ name: 'x', id: categoryId })
       .expect(400)
       .expect('X-Request-Id', /.+/);
@@ -252,9 +473,33 @@ describe('BoardRent API (e2e)', () => {
     ).toEqual(expect.arrayContaining(['q', 'categoryId', 'page', 'limit']));
     expect(listGamesOperation.responses['500']).toBeDefined();
     expect(response.body.servers).toContainEqual({ url: '/api' });
+
+    const verifyPath = Object.keys(response.body.paths).find((path) =>
+      path.endsWith('/auth/verify'),
+    );
+    if (!verifyPath) {
+      throw new Error(
+        'OpenAPI document is missing the token verification path',
+      );
+    }
+    expect(response.body.paths[verifyPath].get.security).toContainEqual({
+      'access-token': [],
+    });
+    const categoriesPath = Object.keys(response.body.paths).find((path) =>
+      path.endsWith('/categories'),
+    );
+    if (!categoriesPath) {
+      throw new Error('OpenAPI document is missing the categories path');
+    }
+    expect(response.body.paths[categoriesPath].post.security).toContainEqual({
+      'access-token': [],
+    });
+    expect(response.body.paths[categoriesPath].get.security).toBeUndefined();
   });
 
   it('supports game CRUD with its category relation', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    const adminToken = await createAccessToken(app, 'ADMIN');
     prisma.category.findUnique.mockResolvedValue(category);
     prisma.game.findMany.mockResolvedValue([game]);
     prisma.game.count.mockResolvedValue(1);
@@ -281,6 +526,7 @@ describe('BoardRent API (e2e)', () => {
       });
     await request(app.getHttpServer())
       .post('/api/games')
+      .set('Authorization', `Bearer ${adminToken}`)
       .send(createGameDto)
       .expect(201)
       .expect(gameResponse);
@@ -290,11 +536,13 @@ describe('BoardRent API (e2e)', () => {
       .expect(gameResponse);
     await request(app.getHttpServer())
       .patch(`/api/games/${gameId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .send({ title: 'Szachy klasyczne' })
       .expect(200)
       .expect(gameResponse);
     await request(app.getHttpServer())
       .delete(`/api/games/${gameId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(204);
   });
 
@@ -336,10 +584,13 @@ describe('BoardRent API (e2e)', () => {
   });
 
   it('rejects a game with an invalid player range', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    const adminToken = await createAccessToken(app, 'ADMIN');
     prisma.category.findUnique.mockResolvedValue(category);
 
     await request(app.getHttpServer())
       .post('/api/games')
+      .set('Authorization', `Bearer ${adminToken}`)
       .send({
         title: 'Nieprawidłowa gra',
         minPlayers: 4,
@@ -354,6 +605,8 @@ describe('BoardRent API (e2e)', () => {
   });
 
   it('supports game-copy CRUD', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    const adminToken = await createAccessToken(app, 'ADMIN');
     prisma.game.findUnique.mockResolvedValue({ id: gameId });
     prisma.gameCopy.findMany.mockResolvedValue([gameCopy]);
     prisma.gameCopy.findUnique.mockResolvedValue(gameCopy);
@@ -367,6 +620,7 @@ describe('BoardRent API (e2e)', () => {
       .expect([gameCopyResponse]);
     await request(app.getHttpServer())
       .post('/api/game-copies')
+      .set('Authorization', `Bearer ${adminToken}`)
       .send({ inventoryCode: 'SZACHY-001', gameId })
       .expect(201)
       .expect(gameCopyResponse);
@@ -376,11 +630,13 @@ describe('BoardRent API (e2e)', () => {
       .expect(gameCopyResponse);
     await request(app.getHttpServer())
       .patch(`/api/game-copies/${copyId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .send({ status: 'MAINTENANCE' })
       .expect(200)
       .expect(gameCopyResponse);
     await request(app.getHttpServer())
       .delete(`/api/game-copies/${copyId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(204);
   });
 });

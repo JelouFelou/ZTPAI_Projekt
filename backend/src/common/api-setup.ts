@@ -23,6 +23,10 @@ export function configureApi(app: INestApplication): void {
       'REST API wypożyczalni gier planszowych. Endpointy katalogu obsługują kategorie, gry i fizyczne egzemplarze.',
     )
     .setVersion('1.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'access-token',
+    )
     .addServer('/api')
     .build();
   const document = SwaggerModule.createDocument(app, config);

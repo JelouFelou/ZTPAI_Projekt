@@ -26,6 +26,7 @@ import {
   ApiRequestIdHeader,
   ApiStandardServerError,
 } from '../common/swagger.decorators.js';
+import { AdminOnly } from '../auth/admin-only.decorator.js';
 import { CategoriesService } from './categories.service.js';
 import { CategoryResponseDto } from './dto/category-response.dto.js';
 import { CreateCategoryDto } from './dto/create-category.dto.js';
@@ -61,6 +62,7 @@ export class CategoriesController {
   @ApiBadRequestResponse({ type: ApiErrorEnvelopeDto })
   @ApiConflictResponse({ type: ApiErrorEnvelopeDto })
   @ApiStandardServerError()
+  @AdminOnly()
   create(@Body() dto: CreateCategoryDto) {
     return this.categories.create(dto);
   }
@@ -72,6 +74,7 @@ export class CategoriesController {
   @ApiNotFoundResponse({ type: ApiErrorEnvelopeDto })
   @ApiConflictResponse({ type: ApiErrorEnvelopeDto })
   @ApiStandardServerError()
+  @AdminOnly()
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateCategoryDto,
@@ -87,6 +90,7 @@ export class CategoriesController {
   @ApiNotFoundResponse({ type: ApiErrorEnvelopeDto })
   @ApiConflictResponse({ type: ApiErrorEnvelopeDto })
   @ApiStandardServerError()
+  @AdminOnly()
   remove(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.categories.remove(id);
   }

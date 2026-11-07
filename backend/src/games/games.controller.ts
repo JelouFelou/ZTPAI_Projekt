@@ -28,6 +28,7 @@ import {
   ApiRequestIdHeader,
   ApiStandardServerError,
 } from '../common/swagger.decorators.js';
+import { AdminOnly } from '../auth/admin-only.decorator.js';
 import { CreateGameDto } from './dto/create-game.dto.js';
 import {
   GameListResponseDto,
@@ -93,6 +94,7 @@ export class GamesController {
   })
   @ApiConflictResponse({ type: ApiErrorEnvelopeDto })
   @ApiStandardServerError()
+  @AdminOnly()
   create(@Body() dto: CreateGameDto) {
     return this.games.create(dto);
   }
@@ -104,6 +106,7 @@ export class GamesController {
   @ApiNotFoundResponse({ type: ApiErrorEnvelopeDto })
   @ApiConflictResponse({ type: ApiErrorEnvelopeDto })
   @ApiStandardServerError()
+  @AdminOnly()
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateGameDto,
@@ -119,6 +122,7 @@ export class GamesController {
   @ApiNotFoundResponse({ type: ApiErrorEnvelopeDto })
   @ApiConflictResponse({ type: ApiErrorEnvelopeDto })
   @ApiStandardServerError()
+  @AdminOnly()
   remove(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.games.remove(id);
   }

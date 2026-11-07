@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { GamesModule } from './games/games.module.js';
 import { GameCopiesModule } from './game-copies/game-copies.module.js';
+import { AuthModule } from './auth/auth.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { GameCopiesModule } from './game-copies/game-copies.module.js';
     CategoriesModule,
     GamesModule,
     GameCopiesModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
