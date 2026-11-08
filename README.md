@@ -28,6 +28,7 @@ API domyślnie działa pod `http://localhost:3000`. `.env.example` zawiera ustaw
 - `/api/auth/verify` — weryfikacja tokenu Bearer
 - `/api/categories` — kategorie gier
 - `/api/games` — gry wraz z kategorią; wyszukiwanie, filtrowanie i paginacja
+- `/api/auth/me` — profil zalogowanego użytkownika
 - `/api/game-copies` — fizyczne egzemplarze gier
 
 Endpointy katalogu obsługują listowanie, pobieranie szczegółu, tworzenie, aktualizowanie i usuwanie. Swagger UI jest dostępne pod `/api/docs`.

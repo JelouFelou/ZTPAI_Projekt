@@ -69,4 +69,15 @@ export class AuthController {
   verifyToken(@CurrentUser() user: AuthUser) {
     return this.auth.verifyToken(user);
   }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get the current user profile' })
+  @ApiOkResponse({ type: AuthUserResponseDto })
+  @ApiUnauthorizedResponse({ type: ApiErrorEnvelopeDto })
+  @ApiStandardServerError()
+  getCurrentUser(@CurrentUser() user: AuthUser) {
+    return this.auth.getCurrentUser(user);
+  }
 }

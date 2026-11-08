@@ -259,6 +259,26 @@ describe('BoardRent API (e2e)', () => {
       .expect({ valid: true, userId });
   });
 
+  it('returns the authenticated user profile without exposing credentials', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    const userToken = await createAccessToken(app, 'USER');
+
+    await request(app.getHttpServer())
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${userToken}`)
+      .expect(200)
+      .expect({
+        id: userId,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        createdAt: user.createdAt.toISOString(),
+      });
+
+    await request(app.getHttpServer()).get('/api/auth/me').expect(401);
+  });
+
   it('rejects invalid credentials and missing or invalid access tokens', async () => {
     const passwordHash = await argon2.hash(validPassword, {
       type: argon2.argon2id,
@@ -483,6 +503,15 @@ describe('BoardRent API (e2e)', () => {
       );
     }
     expect(response.body.paths[verifyPath].get.security).toContainEqual({
+      'access-token': [],
+    });
+    const profilePath = Object.keys(response.body.paths).find((path) =>
+      path.endsWith('/auth/me'),
+    );
+    if (!profilePath) {
+      throw new Error('OpenAPI document is missing the current profile path');
+    }
+    expect(response.body.paths[profilePath].get.security).toContainEqual({
       'access-token': [],
     });
     const categoriesPath = Object.keys(response.body.paths).find((path) =>

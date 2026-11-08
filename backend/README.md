@@ -59,6 +59,7 @@ Wszystkie endpointy są dostępne pod prefiksem `/api`.
 - `POST /api/auth/register` — tworzy konto z rolą `USER`; pola: `email`, `password`, `firstName`, `lastName`
 - `POST /api/auth/login` — weryfikuje hasło i wydaje token JWT Bearer ważny 15 minut
 - `GET /api/auth/verify` — weryfikuje token przekazany w nagłówku `Authorization: Bearer <token>`
+- `GET /api/auth/me` — zwraca profil zalogowanego użytkownika; wymaga tokenu `Bearer`
 
 Hasła są haszowane Argon2id. E-mail jest przy rejestracji normalizowany do małych liter. Hasło musi mieć 12–128 znaków. Rejestracja nie przyjmuje roli od klienta i nie zwraca hasła ani jego hashu. Błędne dane logowania zwracają ten sam komunikat `401`; dla nieistniejącego konta wykonywana jest również weryfikacja Argon2id, aby ograniczyć różnice czasu odpowiedzi. Sekret JWT musi być unikalny, przechowywany poza repozytorium i mieć co najmniej 32 bajty.
 

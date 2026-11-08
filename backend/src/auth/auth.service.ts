@@ -77,6 +77,10 @@ export class AuthService {
     };
   }
 
+  getCurrentUser(user: AuthUser) {
+    return this.toUserResponse(user);
+  }
+
   private async createAuthResponse(user: {
     id: string;
     email: string;
