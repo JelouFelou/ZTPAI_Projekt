@@ -73,6 +73,12 @@ Listę gier można wyszukiwać i filtrować: `GET /api/games?q=catan&categoryId=
 
 Odczyt katalogu (`GET`) jest publiczny. Tworzenie, aktualizowanie i usuwanie kategorii, gier oraz egzemplarzy wymaga tokenu JWT użytkownika z rolą `ADMIN`. Konto rejestrowane przez publiczny endpoint otrzymuje rolę `USER`; nie można ustawić roli w żądaniu rejestracji. Rola i konto są sprawdzane w bazie przy każdym chronionym żądaniu, więc token nie zachowuje uprawnień po zmianie roli ani usunięciu konta. Brak lub nieprawidłowy token zwraca `401`, a poprawny token użytkownika bez wymaganej roli zwraca `403`.
 
+### Wypożyczenia
+
+- `POST /api/loans` — wypożycza egzemplarz, przyjmuje `{ "gameCopyId": "<uuid>" }` i wymaga tokenu JWT; użytkownik jest ustalany na podstawie tokenu
+
+Wypożyczenie trwa 14 dni. Użytkownik może mieć jedno aktywne wypożyczenie; zaległe wypożyczenie blokuje kolejne. Egzemplarz musi mieć status `AVAILABLE` i nie może mieć aktywnego wypożyczenia. Brak egzemplarza zwraca `404`, a naruszenie reguł biznesowych `409`. Zwracany rekord zawiera termin zwrotu oraz podstawowe informacje o egzemplarzu i grze. Endpoint zwrotu zostanie dodany w następnym etapie.
+
 Żądania z body i parametry zapytań są walidowane; nieznane pola zwracają `400`. ID w ścieżkach muszą być UUID. Każda odpowiedź z błędem ma format `{ "error": { "code", "message", "details?", "requestId" } }`; `requestId` jest również zwracany w nagłówku `X-Request-Id`. Nieoczekiwane błędy są logowane po stronie serwera, bez ujawniania szczegółów klientowi. Usunięcie zasobu używanego przez inne rekordy zwraca `409 Conflict`.
 
 ### Dokumentacja API

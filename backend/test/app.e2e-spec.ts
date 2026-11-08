@@ -58,6 +58,19 @@ const gameCopy = {
   updatedAt: new Date('2026-01-02T10:00:00.000Z'),
 };
 
+const loan = {
+  id: '47177c52-25b8-4a2d-b1ef-9d62e3ed5525',
+  status: 'ACTIVE',
+  borrowedAt: new Date('2026-01-03T10:00:00.000Z'),
+  dueAt: new Date('2026-01-17T10:00:00.000Z'),
+  returnedAt: null,
+  gameCopy: {
+    id: copyId,
+    inventoryCode: gameCopy.inventoryCode,
+    game: { id: gameId, title: game.title },
+  },
+};
+
 const categoryResponse = {
   ...category,
   createdAt: category.createdAt.toISOString(),
@@ -80,6 +93,7 @@ const gameCopyResponse = {
 function createDelegate() {
   return {
     findMany: vi.fn().mockResolvedValue([]),
+    findFirst: vi.fn().mockResolvedValue(null),
     findUnique: vi.fn().mockResolvedValue(null),
     count: vi.fn().mockResolvedValue(0),
     create: vi.fn(),
@@ -93,6 +107,7 @@ function createPrismaMock() {
     category: createDelegate(),
     game: createDelegate(),
     gameCopy: createDelegate(),
+    loan: createDelegate(),
     user: createDelegate(),
     $transaction: vi.fn((operations: readonly Promise<unknown>[]) =>
       Promise.all(operations),
@@ -300,6 +315,122 @@ describe('BoardRent API (e2e)', () => {
       .get('/api/auth/verify')
       .set('Authorization', 'Bearer invalid-token')
       .expect(401);
+  });
+
+  it('creates a 14-day loan for the authenticated user', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    prisma.gameCopy.findUnique.mockResolvedValue({
+      id: copyId,
+      status: 'AVAILABLE',
+    });
+    prisma.loan.count.mockResolvedValue(0);
+    prisma.loan.create.mockResolvedValue(loan);
+    const userToken = await createAccessToken(app, 'USER');
+
+    const response = await request(app.getHttpServer())
+      .post('/api/loans')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ gameCopyId: copyId })
+      .expect(201);
+
+    expect(response.body).toEqual({
+      id: loan.id,
+      status: 'ACTIVE',
+      borrowedAt: loan.borrowedAt.toISOString(),
+      dueAt: loan.dueAt.toISOString(),
+      returnedAt: null,
+      gameCopy: loan.gameCopy,
+    });
+    const [createArgs] = prisma.loan.create.mock.calls[0] ?? [];
+    expect(createArgs.data.userId).toBe(userId);
+    expect(createArgs.data.gameCopyId).toBe(copyId);
+    expect(
+      createArgs.data.dueAt.getTime() - createArgs.data.borrowedAt.getTime(),
+    ).toBe(14 * 24 * 60 * 60 * 1000);
+  });
+
+  it('requires authentication and validates the game-copy ID for borrowing', async () => {
+    await request(app.getHttpServer())
+      .post('/api/loans')
+      .send({ gameCopyId: copyId })
+      .expect(401);
+
+    prisma.user.findUnique.mockResolvedValue(user);
+    const userToken = await createAccessToken(app, 'USER');
+    await request(app.getHttpServer())
+      .post('/api/loans')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ gameCopyId: 'not-a-uuid' })
+      .expect(400);
+
+    expect(prisma.loan.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a user who has an overdue loan', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    prisma.loan.findFirst.mockResolvedValueOnce({ id: loan.id });
+    const userToken = await createAccessToken(app, 'USER');
+
+    await request(app.getHttpServer())
+      .post('/api/loans')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ gameCopyId: copyId })
+      .expect(409);
+
+    expect(prisma.loan.count).not.toHaveBeenCalled();
+    expect(prisma.loan.create).not.toHaveBeenCalled();
+  });
+
+  it('enforces the one-active-loan limit', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    prisma.loan.count.mockResolvedValue(1);
+    const userToken = await createAccessToken(app, 'USER');
+
+    await request(app.getHttpServer())
+      .post('/api/loans')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ gameCopyId: copyId })
+      .expect(409);
+
+    expect(prisma.gameCopy.findUnique).not.toHaveBeenCalled();
+    expect(prisma.loan.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing, unavailable, or already borrowed copies', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    prisma.loan.count.mockResolvedValue(0);
+    const userToken = await createAccessToken(app, 'USER');
+
+    await request(app.getHttpServer())
+      .post('/api/loans')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ gameCopyId: copyId })
+      .expect(404);
+
+    prisma.gameCopy.findUnique.mockResolvedValue({
+      id: copyId,
+      status: 'MAINTENANCE',
+    });
+    await request(app.getHttpServer())
+      .post('/api/loans')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ gameCopyId: copyId })
+      .expect(409);
+
+    prisma.gameCopy.findUnique.mockResolvedValue({
+      id: copyId,
+      status: 'AVAILABLE',
+    });
+    prisma.loan.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: loan.id });
+    await request(app.getHttpServer())
+      .post('/api/loans')
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ gameCopyId: copyId })
+      .expect(409);
+
+    expect(prisma.loan.create).not.toHaveBeenCalled();
   });
 
   it('requires an ADMIN token for every catalog mutation', async () => {
@@ -524,6 +655,16 @@ describe('BoardRent API (e2e)', () => {
       'access-token': [],
     });
     expect(response.body.paths[categoriesPath].get.security).toBeUndefined();
+    const loansPath = Object.keys(response.body.paths).find((path) =>
+      path.endsWith('/loans'),
+    );
+    if (!loansPath) {
+      throw new Error('OpenAPI document is missing the loans path');
+    }
+    expect(response.body.paths[loansPath].post.security).toContainEqual({
+      'access-token': [],
+    });
+    expect(response.body.paths[loansPath].post.responses['409']).toBeDefined();
   });
 
   it('supports game CRUD with its category relation', async () => {
