@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LoansService } from './loans.service.js';
@@ -146,5 +150,48 @@ describe('LoansService borrowing rules', () => {
     await expect(
       service.borrow('user', { gameCopyId: 'copy' }),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('rechecks rules if acquiring a transaction timed out before it started', async () => {
+    const { service, prisma, transaction } = setup();
+    prisma.$transaction.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError(
+        'Unable to start a transaction',
+        { code: 'P2028', clientVersion: 'test' },
+      ),
+    );
+    transaction.loan.count.mockResolvedValue(1);
+    await expect(
+      service.borrow('user', { gameCopyId: 'copy' }),
+    ).rejects.toThrow('at most');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(transaction.loan.create).not.toHaveBeenCalled();
+  });
+
+  it('returns service unavailable when no transaction can be acquired after three attempts', async () => {
+    const { service, prisma } = setup();
+    prisma.$transaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        'Unable to start a transaction',
+        { code: 'P2028', clientVersion: 'test' },
+      ),
+    );
+    await expect(
+      service.borrow('user', { gameCopyId: 'copy' }),
+    ).rejects.toThrow(ServiceUnavailableException);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retry other P2028 errors from an already started transaction', async () => {
+    const { service, prisma, transaction } = setup();
+    const error = new Prisma.PrismaClientKnownRequestError(
+      'Transaction already closed',
+      { code: 'P2028', clientVersion: 'test' },
+    );
+    transaction.loan.count.mockRejectedValue(error);
+    await expect(service.borrow('user', { gameCopyId: 'copy' })).rejects.toBe(
+      error,
+    );
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 });

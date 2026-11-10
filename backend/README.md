@@ -100,6 +100,7 @@ Skrypt tworzy konto `ADMIN` z hasłem haszowanym Argon2id. Istniejącego konta n
 - `GameCopy.status` opisuje stan egzemplarza. `isAvailable` jest prawdziwe tylko przy `AVAILABLE` i braku aktywnego wypożyczenia. Gry zwracają liczbę takich egzemplarzy jako `availableCopies`.
 - Zmiana `gameId` egzemplarza z historią wypożyczeń zwraca `409`, również po zwrocie. Edycja pozostałych pól nadal jest możliwa.
 - Sprawdzenia i zapis wypożyczenia odbywają się w transakcji `Serializable`. Konflikty serializacji powodują ponowienie całej operacji, maksymalnie trzy próby; nierozstrzygnięty konflikt zwraca `409`.
+- Przekroczenie czasu oczekiwania na rozpoczęcie transakcji również pozwala na ponowienie w ramach tych trzech prób. Jeżeli nadal nie można rozpocząć transakcji, API zwraca `503`. Inne błędy `P2028` powstałe już wewnątrz transakcji nie są ponawiane.
 - Migracja `20261108220000_unique_active_copy_loan` dodaje częściowy indeks unikalny dla aktywnego wypożyczenia egzemplarza. Prisma nie odwzorowuje go w schemacie — bazę przygotowuj migracjami, nie samym `db push`. Jeśli baza ma już podwójne aktywne wypożyczenia, migracja odmówi ich zaakceptowania; najpierw rozstrzygnij te rekordy.
 - Limit wynosi jedno aktywne wypożyczenie na użytkownika. To aktualne założenie, zmienione względem roboczego planu przewidującego trzy.
 

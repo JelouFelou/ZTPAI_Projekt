@@ -12,15 +12,21 @@ if (!url)
   );
 
 const prisma = new PrismaService({ datasourceUrl: url });
+const otherPrisma = new PrismaService({ datasourceUrl: url });
 const loans = new LoansService(prisma);
+const otherLoans = new LoansService(otherPrisma);
 const copies = new GameCopiesService(prisma);
 let userIds: string[] = [];
 let copyIds: string[] = [];
 let categoryId: string;
 let gameId: string;
 
-beforeAll(() => prisma.$connect());
-afterAll(() => prisma.$disconnect());
+beforeAll(async () => {
+  await Promise.all([prisma.$connect(), otherPrisma.$connect()]);
+});
+afterAll(async () => {
+  await Promise.all([prisma.$disconnect(), otherPrisma.$disconnect()]);
+});
 
 beforeEach(async () => {
   userIds = [];
@@ -87,7 +93,9 @@ it('persists borrowing and exposes actual availability', async () => {
 
 it('allows only one of two users to borrow the same copy concurrently', async () => {
   const results = await Promise.allSettled(
-    userIds.map((id) => loans.borrow(id, { gameCopyId: copyIds[0] })),
+    userIds.map((id, index) =>
+      (index === 0 ? loans : otherLoans).borrow(id, { gameCopyId: copyIds[0] }),
+    ),
   );
   expect(
     results.filter((result) => result.status === 'fulfilled'),
@@ -103,7 +111,9 @@ it('allows only one of two users to borrow the same copy concurrently', async ()
 
 it('enforces the user limit across concurrent requests for different copies', async () => {
   const results = await Promise.allSettled(
-    copyIds.map((id) => loans.borrow(userIds[0], { gameCopyId: id })),
+    copyIds.map((id, index) =>
+      (index === 0 ? loans : otherLoans).borrow(userIds[0], { gameCopyId: id }),
+    ),
   );
   expect(
     results.filter((result) => result.status === 'fulfilled'),
@@ -129,6 +139,23 @@ it('enforces the partial unique index even outside the borrowing service', async
       },
     }),
   ).rejects.toMatchObject({ code: 'P2002' });
+});
+
+it('handles competing requests sharing a single Prisma connection pool', async () => {
+  const results = await Promise.allSettled(
+    copyIds.map((id) => loans.borrow(userIds[0], { gameCopyId: id })),
+  );
+  expect(
+    results.filter((result) => result.status === 'fulfilled'),
+  ).toHaveLength(1);
+  expect(
+    results.find((result) => result.status === 'rejected')?.reason,
+  ).toBeInstanceOf(ConflictException);
+  expect(
+    await prisma.loan.count({
+      where: { userId: userIds[0], status: 'ACTIVE' },
+    }),
+  ).toBe(1);
 });
 
 it('protects loan history even after a return', async () => {
