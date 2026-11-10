@@ -18,6 +18,9 @@ export class GameCopyResponseDto {
   @ApiProperty({ enum: ['AVAILABLE', 'MAINTENANCE', 'RETIRED'] })
   status!: 'AVAILABLE' | 'MAINTENANCE' | 'RETIRED';
 
+  @ApiProperty({ description: 'AVAILABLE and without an active loan' })
+  isAvailable!: boolean;
+
   @ApiProperty({ format: 'uuid' })
   gameId!: string;
 

@@ -30,6 +30,9 @@ export class GameResponseDto {
   @ApiProperty({ type: CategoryResponseDto })
   category!: CategoryResponseDto;
 
+  @ApiProperty({ minimum: 0, description: 'Copies available for borrowing' })
+  availableCopies!: number;
+
   @ApiProperty({ format: 'date-time' })
   createdAt!: string;
 

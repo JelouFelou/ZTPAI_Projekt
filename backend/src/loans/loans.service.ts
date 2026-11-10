@@ -3,7 +3,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { LoanStatus } from '@prisma/client';
+import { LoanStatus, Prisma } from '@prisma/client';
+import { serializableTransaction } from '../common/serializable-transaction.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateLoanDto } from './dto/create-loan.dto.js';
 import { toLoanResponse } from './loan.mapper.js';
@@ -27,11 +28,32 @@ export class LoansService {
   constructor(private readonly prisma: PrismaService) {}
 
   async borrow(userId: string, dto: CreateLoanDto) {
-    const overdueLoan = await this.prisma.loan.findFirst({
+    try {
+      return await serializableTransaction(this.prisma, (transaction) =>
+        this.borrowInTransaction(transaction, userId, dto),
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Game copy is already borrowed');
+      }
+      throw error;
+    }
+  }
+
+  private async borrowInTransaction(
+    prisma: Prisma.TransactionClient,
+    userId: string,
+    dto: CreateLoanDto,
+  ) {
+    const borrowedAt = new Date();
+    const overdueLoan = await prisma.loan.findFirst({
       where: {
         userId,
         status: LoanStatus.ACTIVE,
-        dueAt: { lt: new Date() },
+        dueAt: { lt: borrowedAt },
       },
       select: { id: true },
     });
@@ -42,7 +64,7 @@ export class LoansService {
       );
     }
 
-    const activeLoanCount = await this.prisma.loan.count({
+    const activeLoanCount = await prisma.loan.count({
       where: { userId, status: LoanStatus.ACTIVE },
     });
 
@@ -52,7 +74,7 @@ export class LoansService {
       );
     }
 
-    const gameCopy = await this.prisma.gameCopy.findUnique({
+    const gameCopy = await prisma.gameCopy.findUnique({
       where: { id: dto.gameCopyId },
       select: { id: true, status: true },
     });
@@ -65,7 +87,7 @@ export class LoansService {
       throw new ConflictException('Game copy is not available');
     }
 
-    const activeCopyLoan = await this.prisma.loan.findFirst({
+    const activeCopyLoan = await prisma.loan.findFirst({
       where: {
         gameCopyId: gameCopy.id,
         status: LoanStatus.ACTIVE,
@@ -77,11 +99,10 @@ export class LoansService {
       throw new ConflictException('Game copy is already borrowed');
     }
 
-    const borrowedAt = new Date();
     const dueAt = new Date(
       borrowedAt.getTime() + LOAN_DURATION_DAYS * MILLISECONDS_PER_DAY,
     );
-    const loan = await this.prisma.loan.create({
+    const loan = await prisma.loan.create({
       data: {
         userId,
         gameCopyId: gameCopy.id,

@@ -7,7 +7,7 @@ REST API aplikacji BoardRent zbudowane w NestJS i TypeScript.
 Z katalogu `backend` skopiuj przykładową konfigurację i ustaw własny sekret JWT:
 
 ```powershell
-npm install
+npm ci
 Copy-Item .env.example .env
 [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 ```
@@ -84,3 +84,48 @@ Wypożyczenie trwa 14 dni. Użytkownik może mieć jedno aktywne wypożyczenie; 
 ### Dokumentacja API
 
 Swagger UI jest dostępne pod `http://localhost:3000/api/docs`; surowy dokument OpenAPI pod `http://localhost:3000/api/docs-json`.
+
+## Administrator
+
+Po migracjach ustaw lokalnie w `backend/.env` wartości `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12–128 znaków), `ADMIN_FIRST_NAME` i `ADMIN_LAST_NAME` (1–100 znaków). Następnie w katalogu `backend` uruchom:
+
+```powershell
+npm run db:create-admin
+```
+
+Skrypt tworzy konto `ADMIN` z hasłem haszowanym Argon2id. Istniejącego konta nie zmienia ani nie podnosi jego uprawnień. Po utworzeniu usuń hasło administratora z `.env`; logowanie działa przez zwykły endpoint. Nie dodawaj `.env` do repozytorium.
+
+## Spójność i dostępność
+
+- `GameCopy.status` opisuje stan egzemplarza. `isAvailable` jest prawdziwe tylko przy `AVAILABLE` i braku aktywnego wypożyczenia. Gry zwracają liczbę takich egzemplarzy jako `availableCopies`.
+- Zmiana `gameId` egzemplarza z historią wypożyczeń zwraca `409`, również po zwrocie. Edycja pozostałych pól nadal jest możliwa.
+- Sprawdzenia i zapis wypożyczenia odbywają się w transakcji `Serializable`. Konflikty serializacji powodują ponowienie całej operacji, maksymalnie trzy próby; nierozstrzygnięty konflikt zwraca `409`.
+- Migracja `20261108220000_unique_active_copy_loan` dodaje częściowy indeks unikalny dla aktywnego wypożyczenia egzemplarza. Prisma nie odwzorowuje go w schemacie — bazę przygotowuj migracjami, nie samym `db push`. Jeśli baza ma już podwójne aktywne wypożyczenia, migracja odmówi ich zaakceptowania; najpierw rozstrzygnij te rekordy.
+- Limit wynosi jedno aktywne wypożyczenie na użytkownika. To aktualne założenie, zmienione względem roboczego planu przewidującego trzy.
+
+## Weryfikacja
+
+```powershell
+npm test
+npm run test:e2e
+npm run build
+npm run lint
+```
+
+`test:e2e` sprawdza HTTP, walidację i uprawnienia z atrapą Prisma; nie testuje PostgreSQL. Osobny zestaw `test:db` sprawdza trwały zapis, dostępność, ochronę historii, indeks unikalny oraz równoczesne wypożyczenia przez rzeczywistą bazę.
+
+Przygotuj **osobną bazę testową**, np. `boardrent_test`, i zastosuj w niej migracje. W PowerShell, z katalogu `backend`:
+
+```powershell
+$env:TEST_DATABASE_URL = 'postgresql://boardrent:boardrent-local@localhost:5432/boardrent_test?schema=public'
+$previousDatabaseUrl = $env:DATABASE_URL
+try {
+  $env:DATABASE_URL = $env:TEST_DATABASE_URL
+  npm run db:deploy
+} finally {
+  $env:DATABASE_URL = $previousDatabaseUrl
+}
+npm run test:db
+```
+
+Testy tworzą własne rekordy z losowymi identyfikatorami i usuwają je po każdym przypadku. Brak `TEST_DATABASE_URL` kończy zestaw błędem; testy nie użyją automatycznie bazy aplikacji.

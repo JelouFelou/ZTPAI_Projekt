@@ -27,7 +27,7 @@ export function configureApi(app: INestApplication): void {
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
       'access-token',
     )
-    .addServer('/api')
+    .addServer('/')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document, {

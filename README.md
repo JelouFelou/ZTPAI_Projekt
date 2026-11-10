@@ -15,6 +15,7 @@ Copy-Item backend/.env.example backend/.env
 # W backend/.env ustaw AUTH_JWT_SECRET na losowy sekret o długości co najmniej 32 bajtów.
 docker compose up -d db
 cd backend
+npm ci
 npm run db:generate
 npm run db:migrate
 npm run start:dev
@@ -42,7 +43,11 @@ Zalogowany użytkownik może wypożyczyć dostępny egzemplarz przez `POST /api/
 
 ```powershell
 cd frontend
+npm ci
 npm run dev
 ```
 
 Vite wypisze lokalny adres aplikacji w terminalu.
+
+Tworzenie konta administratora i uruchamianie testów opisuje [backend/README.md](./backend/README.md).
+API egzemplarzy zwraca `isAvailable`, a API gier `availableCopies`. Status `AVAILABLE` opisuje stan egzemplarza; samo wypożyczenie nie zmienia go.

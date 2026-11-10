@@ -2,7 +2,10 @@ import type { Category, Game } from '@prisma/client';
 import { toCategoryResponse } from '../categories/category.mapper.js';
 import type { GameResponseDto } from './dto/game-response.dto.js';
 
-type GameWithCategory = Game & { category: Category };
+type GameWithCategory = Game & {
+  category: Category;
+  _count: { copies: number };
+};
 
 export function toGameResponse(game: GameWithCategory): GameResponseDto {
   return {
@@ -15,6 +18,7 @@ export function toGameResponse(game: GameWithCategory): GameResponseDto {
     durationMinutes: game.durationMinutes,
     categoryId: game.categoryId,
     category: toCategoryResponse(game.category),
+    availableCopies: game._count.copies,
     createdAt: game.createdAt.toISOString(),
     updatedAt: game.updatedAt.toISOString(),
   };

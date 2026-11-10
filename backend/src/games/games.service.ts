@@ -12,7 +12,16 @@ import { ListGamesQueryDto } from './dto/list-games-query.dto.js';
 import { toGameResponse } from './game.mapper.js';
 import type { GameListResponseDto } from './dto/game-response.dto.js';
 
-const gameResponse = { category: true } as const;
+const gameResponse = {
+  category: true,
+  _count: {
+    select: {
+      copies: {
+        where: { status: 'AVAILABLE', loans: { none: { status: 'ACTIVE' } } },
+      },
+    },
+  },
+} as const;
 
 @Injectable()
 export class GamesService {

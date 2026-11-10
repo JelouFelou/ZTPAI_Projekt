@@ -3,6 +3,7 @@ import type { GameCopyResponseDto } from './dto/game-copy-response.dto.js';
 
 type GameCopyWithGame = GameCopy & {
   game: { id: string; title: string };
+  _count: { loans: number };
 };
 
 export function toGameCopyResponse(
@@ -12,6 +13,7 @@ export function toGameCopyResponse(
     id: copy.id,
     inventoryCode: copy.inventoryCode,
     status: copy.status,
+    isAvailable: copy.status === 'AVAILABLE' && copy._count.loans === 0,
     gameId: copy.gameId,
     game: {
       id: copy.game.id,

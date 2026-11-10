@@ -35,6 +35,7 @@ const category = {
 };
 
 const game = {
+  _count: { copies: 1 },
   id: gameId,
   title: 'Szachy',
   description: null,
@@ -49,6 +50,7 @@ const game = {
 };
 
 const gameCopy = {
+  _count: { loans: 0 },
   id: copyId,
   inventoryCode: 'SZACHY-001',
   status: 'AVAILABLE',
@@ -77,15 +79,19 @@ const categoryResponse = {
   updatedAt: category.updatedAt.toISOString(),
 };
 
+const { _count: _gameCount, ...gameFields } = game;
 const gameResponse = {
-  ...game,
+  ...gameFields,
+  availableCopies: 1,
   category: categoryResponse,
   createdAt: game.createdAt.toISOString(),
   updatedAt: game.updatedAt.toISOString(),
 };
 
+const { _count: _copyCount, ...copyFields } = gameCopy;
 const gameCopyResponse = {
-  ...gameCopy,
+  ...copyFields,
+  isAvailable: true,
   createdAt: gameCopy.createdAt.toISOString(),
   updatedAt: gameCopy.updatedAt.toISOString(),
 };
@@ -103,14 +109,24 @@ function createDelegate() {
 }
 
 function createPrismaMock() {
-  return {
+  const prisma = {
     category: createDelegate(),
     game: createDelegate(),
     gameCopy: createDelegate(),
     loan: createDelegate(),
     user: createDelegate(),
-    $transaction: vi.fn((operations: readonly Promise<unknown>[]) =>
-      Promise.all(operations),
+  };
+  return {
+    ...prisma,
+    $transaction: vi.fn(
+      (
+        operations:
+          | readonly Promise<unknown>[]
+          | ((transaction: typeof prisma) => Promise<unknown>),
+      ) =>
+        typeof operations === 'function'
+          ? operations(prisma)
+          : Promise.all(operations),
     ),
   };
 }
@@ -623,7 +639,13 @@ describe('BoardRent API (e2e)', () => {
       listGamesOperation.parameters.map(({ name }: { name: string }) => name),
     ).toEqual(expect.arrayContaining(['q', 'categoryId', 'page', 'limit']));
     expect(listGamesOperation.responses['500']).toBeDefined();
-    expect(response.body.servers).toContainEqual({ url: '/api' });
+    expect(response.body.servers).toContainEqual({ url: '/' });
+    const documentedUrl = new URL(
+      `${response.body.servers[0].url.replace(/\/$/, '')}${gamesPath}`,
+      'http://localhost',
+    );
+    expect(documentedUrl.pathname).toBe('/api/games');
+    await request(app.getHttpServer()).get(documentedUrl.pathname).expect(200);
 
     const verifyPath = Object.keys(response.body.paths).find((path) =>
       path.endsWith('/auth/verify'),
@@ -808,5 +830,83 @@ describe('BoardRent API (e2e)', () => {
       .delete(`/api/game-copies/${copyId}`)
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(204);
+  });
+
+  it('reports borrowed and maintenance copies as unavailable', async () => {
+    prisma.gameCopy.findUnique.mockResolvedValue({
+      ...gameCopy,
+      _count: { loans: 1 },
+    });
+    const borrowed = await request(app.getHttpServer())
+      .get(`/api/game-copies/${copyId}`)
+      .expect(200);
+    expect(borrowed.body).toMatchObject({
+      status: 'AVAILABLE',
+      isAvailable: false,
+    });
+    expect(borrowed.body).not.toHaveProperty('_count');
+    prisma.gameCopy.findUnique.mockResolvedValue({
+      ...gameCopy,
+      status: 'MAINTENANCE',
+    });
+    const maintenance = await request(app.getHttpServer())
+      .get(`/api/game-copies/${copyId}`)
+      .expect(200);
+    expect(maintenance.body.isAvailable).toBe(false);
+  });
+
+  it('prevents an administrator from reassigning a copy with loan history', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    prisma.gameCopy.findUnique.mockResolvedValue({
+      ...gameCopy,
+      _count: { loans: 1 },
+    });
+    const token = await createAccessToken(app, 'ADMIN');
+    await request(app.getHttpServer())
+      .patch(`/api/game-copies/${copyId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ gameId: '080f8579-82bd-48e0-8ad7-b616150f3822' })
+      .expect(409);
+    expect(prisma.gameCopy.update).not.toHaveBeenCalled();
+  });
+
+  it('allows reassigning a copy without history', async () => {
+    const otherGameId = '080f8579-82bd-48e0-8ad7-b616150f3822';
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    prisma.gameCopy.findUnique.mockResolvedValue(gameCopy);
+    prisma.game.findUnique.mockResolvedValue({ id: otherGameId });
+    prisma.gameCopy.update.mockResolvedValue({
+      ...gameCopy,
+      gameId: otherGameId,
+    });
+    const token = await createAccessToken(app, 'ADMIN');
+    const response = await request(app.getHttpServer())
+      .patch(`/api/game-copies/${copyId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ gameId: otherGameId })
+      .expect(200);
+    expect(response.body.gameId).toBe(otherGameId);
+  });
+
+  it('allows other edits and the unchanged game on a copy with history', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    prisma.gameCopy.findUnique.mockResolvedValue({
+      ...gameCopy,
+      _count: { loans: 1 },
+    });
+    prisma.gameCopy.update.mockResolvedValue({
+      ...gameCopy,
+      status: 'MAINTENANCE',
+    });
+    const token = await createAccessToken(app, 'ADMIN');
+    const response = await request(app.getHttpServer())
+      .patch(`/api/game-copies/${copyId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ gameId, status: 'MAINTENANCE' })
+      .expect(200);
+    expect(response.body).toMatchObject({
+      status: 'MAINTENANCE',
+      isAvailable: false,
+    });
   });
 });
