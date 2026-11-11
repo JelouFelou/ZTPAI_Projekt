@@ -82,7 +82,7 @@ model GameCopy {
 }
 
 model Loan {
-  // One ACTIVE loan per copy is enforced by a partial unique index in SQL migrations.
+  // Partial unique indexes in SQL migrations enforce one ACTIVE loan per copy and per user.
   id         String     @id @default(uuid()) @db.Uuid
   userId     String     @map("user_id") @db.Uuid
   gameCopyId String     @map("game_copy_id") @db.Uuid

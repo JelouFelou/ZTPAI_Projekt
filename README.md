@@ -31,13 +31,18 @@ API domyślnie działa pod `http://localhost:3000`. `.env.example` zawiera ustaw
 - `/api/games` — gry wraz z kategorią; wyszukiwanie, filtrowanie i paginacja
 - `/api/auth/me` — profil zalogowanego użytkownika
 - `/api/game-copies` — fizyczne egzemplarze gier
-- `/api/loans` — wypożyczenie dostępnego egzemplarza
+- `/api/loans` — wypożyczenie dostępnego egzemplarza; `PATCH /api/loans/:id/return` — zwrot własnego wypożyczenia
+- `GET /api/loans/me` — własna historia wypożyczeń; `GET /api/loans` — historia wszystkich użytkowników dla administratora
 
 Endpointy katalogu obsługują listowanie, pobieranie szczegółu, tworzenie, aktualizowanie i usuwanie. Swagger UI jest dostępne pod `/api/docs`.
 
 Hasła są haszowane Argon2id. Token JWT jest podpisany HS256 i wygasa po 15 minutach. Odczyt katalogu jest publiczny, a jego modyfikacja wymaga roli `ADMIN`; rejestracja tworzy konto `USER`. Szczegóły endpointów, odpowiedzi i konfiguracji opisuje [backend/README.md](./backend/README.md).
 
 Zalogowany użytkownik może wypożyczyć dostępny egzemplarz przez `POST /api/loans`. Wypożyczenie trwa 14 dni, a limit wynosi jedno aktywne wypożyczenie na użytkownika.
+
+Zwrot przez `PATCH /api/loans/:id/return` zapisuje `RETURNED` i datę `returnedAt`. Ponowny zwrot zwraca `409`; nieistniejące i cudze wypożyczenia zwracają `404`. Dostępność jest przeliczana automatycznie, z uwzględnieniem stanu egzemplarza.
+
+Historia obejmuje aktywne i zwrócone wypożyczenia, od najnowszych. Obsługuje `status=ACTIVE|RETURNED`, `page` i `limit`; administrator może dodatkowo filtrować po `userId`.
 
 ## Frontend
 

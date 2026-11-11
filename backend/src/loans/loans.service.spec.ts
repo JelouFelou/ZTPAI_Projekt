@@ -149,7 +149,9 @@ describe('LoansService borrowing rules', () => {
     );
     await expect(
       service.borrow('user', { gameCopyId: 'copy' }),
-    ).rejects.toThrow(ConflictException);
+    ).rejects.toThrow(
+      'An active loan already exists for this user or game copy',
+    );
   });
 
   it('rechecks rules if acquiring a transaction timed out before it started', async () => {

@@ -76,8 +76,17 @@ Odczyt katalogu (`GET`) jest publiczny. Tworzenie, aktualizowanie i usuwanie kat
 ### Wypożyczenia
 
 - `POST /api/loans` — wypożycza egzemplarz, przyjmuje `{ "gameCopyId": "<uuid>" }` i wymaga tokenu JWT; użytkownik jest ustalany na podstawie tokenu
+- `GET /api/loans/me` — historia zalogowanego użytkownika; tożsamość pochodzi wyłącznie z tokenu, parametr `userId` jest odrzucany
+- `GET /api/loans` — historia wszystkich użytkowników, wymaga roli `ADMIN`; opcjonalny filtr `userId=<uuid>`
+- `PATCH /api/loans/:id/return` — zwraca własne aktywne wypożyczenie; wymaga tokenu JWT i UUID wypożyczenia, bez body. Zwraca `200` z wypożyczeniem w statusie `RETURNED` i datą `returnedAt` ustaloną przez serwer. Nie zmienia `borrowedAt` ani `dueAt`.
 
-Wypożyczenie trwa 14 dni. Użytkownik może mieć jedno aktywne wypożyczenie; zaległe wypożyczenie blokuje kolejne. Egzemplarz musi mieć status `AVAILABLE` i nie może mieć aktywnego wypożyczenia. Brak egzemplarza zwraca `404`, a naruszenie reguł biznesowych `409`. Zwracany rekord zawiera termin zwrotu oraz podstawowe informacje o egzemplarzu i grze. Endpoint zwrotu zostanie dodany w następnym etapie.
+Wypożyczenie trwa 14 dni. Użytkownik może mieć jedno aktywne wypożyczenie; zaległe wypożyczenie blokuje kolejne. Egzemplarz musi mieć status `AVAILABLE` i nie może mieć aktywnego wypożyczenia. Brak egzemplarza zwraca `404`, a naruszenie reguł biznesowych `409`. Zwracany rekord zawiera termin zwrotu oraz podstawowe informacje o egzemplarzu i grze.
+
+Zwrot nieistniejącego lub cudzego wypożyczenia zwraca `404` (również dla administratora); ponowny zwrot zwraca `409` i zachowuje pierwotną datę zwrotu. Brak tokenu zwraca `401`, a niepoprawny UUID — `400`. Zwrot jest transakcyjny: przy dwóch równoczesnych żądaniach tylko jedno może się powieść. Można zwrócić także zaległą grę. Zwrot zwalnia limit użytkownika i przywraca dostępność egzemplarza tylko wtedy, gdy jego status to `AVAILABLE`; nie zmienia `MAINTENANCE` ani `RETIRED`.
+
+Historia domyślnie obejmuje statusy `ACTIVE` i `RETURNED`. Oba endpointy listowania przyjmują `status=ACTIVE|RETURNED`, `page` (domyślnie 1, maksymalnie 1000000) i `limit` (domyślnie 20, maksymalnie 100). Odpowiedź ma format `{ data: [...], pagination: { page, limit, total, totalPages } }`. Sortowanie: `borrowedAt DESC`, a przy jednakowych datach `id DESC`. Pusta historia ma `totalPages=0`; strona poza zakresem zwraca pustą listę z rzeczywistą liczbą wyników. Lista i licznik są pobierane z jednego obrazu danych w transakcji `RepeatableRead`.
+
+Wpis zawiera daty, status i informacje o egzemplarzu oraz grze. Widok administratora dodaje pole `user` z `id`, `email`, `firstName` i `lastName`, bez hasła i jego hashu. Zwykły użytkownik otrzymuje `403` dla `GET /api/loans`; brak tokenu na obu endpointach zwraca `401`. Niepoprawne filtry i nieznane parametry zwracają `400`. Przykłady: `GET /api/loans/me?status=RETURNED&page=1&limit=10`, `GET /api/loans?status=ACTIVE&userId=<uuid>`.
 
 Żądania z body i parametry zapytań są walidowane; nieznane pola zwracają `400`. ID w ścieżkach muszą być UUID. Każda odpowiedź z błędem ma format `{ "error": { "code", "message", "details?", "requestId" } }`; `requestId` jest również zwracany w nagłówku `X-Request-Id`. Nieoczekiwane błędy są logowane po stronie serwera, bez ujawniania szczegółów klientowi. Usunięcie zasobu używanego przez inne rekordy zwraca `409 Conflict`.
 
@@ -102,6 +111,7 @@ Skrypt tworzy konto `ADMIN` z hasłem haszowanym Argon2id. Istniejącego konta n
 - Sprawdzenia i zapis wypożyczenia odbywają się w transakcji `Serializable`. Konflikty serializacji powodują ponowienie całej operacji, maksymalnie trzy próby; nierozstrzygnięty konflikt zwraca `409`.
 - Przekroczenie czasu oczekiwania na rozpoczęcie transakcji również pozwala na ponowienie w ramach tych trzech prób. Jeżeli nadal nie można rozpocząć transakcji, API zwraca `503`. Inne błędy `P2028` powstałe już wewnątrz transakcji nie są ponawiane.
 - Migracja `20261108220000_unique_active_copy_loan` dodaje częściowy indeks unikalny dla aktywnego wypożyczenia egzemplarza. Prisma nie odwzorowuje go w schemacie — bazę przygotowuj migracjami, nie samym `db push`. Jeśli baza ma już podwójne aktywne wypożyczenia, migracja odmówi ich zaakceptowania; najpierw rozstrzygnij te rekordy.
+- Migracja `20261110220000_unique_active_user_loan` dodaje analogiczny indeks dla użytkownika. Baza pilnuje więc limitu jednego aktywnego wypożyczenia również przy zapisach poza serwisem. Zmiana limitu na więcej niż jedno wymaga najpierw zmiany tego indeksu w nowej migracji. Jeśli w bazie istnieją już wielokrotne aktywne wypożyczenia użytkownika, trzeba je rozstrzygnąć przed migracją.
 - Limit wynosi jedno aktywne wypożyczenie na użytkownika. To aktualne założenie, zmienione względem roboczego planu przewidującego trzy.
 
 ## Weryfikacja

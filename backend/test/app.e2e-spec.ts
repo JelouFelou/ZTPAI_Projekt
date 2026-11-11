@@ -365,6 +365,185 @@ describe('BoardRent API (e2e)', () => {
     ).toBe(14 * 24 * 60 * 60 * 1000);
   });
 
+  it('returns an owned loan with status 200 and an ISO return date', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    prisma.loan.findFirst.mockResolvedValue(loan);
+    const returnedAt = new Date('2026-01-04T12:00:00Z');
+    prisma.loan.update.mockResolvedValue({
+      ...loan,
+      status: 'RETURNED',
+      returnedAt,
+    });
+    const token = await createAccessToken(app, 'USER');
+    const response = await request(app.getHttpServer())
+      .patch(`/api/loans/${loan.id}/return`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(response.body).toMatchObject({
+      id: loan.id,
+      status: 'RETURNED',
+      returnedAt: returnedAt.toISOString(),
+      dueAt: loan.dueAt.toISOString(),
+    });
+    expect(prisma.loan.findFirst).toHaveBeenCalledWith({
+      where: { id: loan.id, userId },
+      select: { id: true, status: true },
+    });
+    expect(prisma.loan.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: 'RETURNED', returnedAt: expect.any(Date) },
+      }),
+    );
+  });
+
+  it('requires authentication and a UUID when returning a loan', async () => {
+    await request(app.getHttpServer())
+      .patch(`/api/loans/${loan.id}/return`)
+      .expect(401);
+    prisma.user.findUnique.mockResolvedValue(user);
+    const token = await createAccessToken(app, 'USER');
+    await request(app.getHttpServer())
+      .patch('/api/loans/invalid/return')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(400);
+    expect(prisma.loan.update).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a missing or unowned loan', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    const token = await createAccessToken(app, 'USER');
+    const response = await request(app.getHttpServer())
+      .patch(`/api/loans/${loan.id}/return`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+    expect(response.body.error).toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'Loan not found',
+    });
+    expect(prisma.loan.update).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 for a repeated return', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    prisma.loan.findFirst.mockResolvedValue({ ...loan, status: 'RETURNED' });
+    const token = await createAccessToken(app, 'USER');
+    const response = await request(app.getHttpServer())
+      .patch(`/api/loans/${loan.id}/return`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(409);
+    expect(response.body.error.code).toBe('CONFLICT');
+    expect(prisma.loan.update).not.toHaveBeenCalled();
+  });
+
+  it('lists only the current user’s history with pagination and no borrower credentials', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    prisma.loan.findMany.mockResolvedValue([{ ...loan, user }]);
+    prisma.loan.count.mockResolvedValue(3);
+    const token = await createAccessToken(app, 'USER');
+    const response = await request(app.getHttpServer())
+      .get('/api/loans/me?status=RETURNED&page=2&limit=1')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(response.body.pagination).toEqual({
+      page: 2,
+      limit: 1,
+      total: 3,
+      totalPages: 3,
+    });
+    expect(response.body.data[0]).not.toHaveProperty('user');
+    expect(response.body.data[0]).not.toHaveProperty('passwordHash');
+    expect(prisma.loan.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId, status: 'RETURNED' },
+        skip: 1,
+        take: 1,
+        orderBy: [{ borrowedAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+    expect(prisma.loan.count).toHaveBeenCalledWith({
+      where: { userId, status: 'RETURNED' },
+    });
+  });
+
+  it('protects both history endpoints and reserves the global history for ADMIN', async () => {
+    await request(app.getHttpServer()).get('/api/loans/me').expect(401);
+    await request(app.getHttpServer()).get('/api/loans').expect(401);
+    prisma.user.findUnique.mockResolvedValue(user);
+    const token = await createAccessToken(app, 'USER');
+    await request(app.getHttpServer())
+      .get('/api/loans')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403);
+    expect(prisma.loan.findMany).not.toHaveBeenCalled();
+  });
+
+  it('allows ADMIN to list all loans and filter by borrower and status', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    prisma.loan.findMany.mockResolvedValue([
+      { ...loan, user: { ...user, passwordHash: 'must-not-leak' } },
+    ]);
+    prisma.loan.count.mockResolvedValue(1);
+    const token = await createAccessToken(app, 'ADMIN');
+    const response = await request(app.getHttpServer())
+      .get('/api/loans')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(response.body.data[0].user).toEqual({
+      id: userId,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    });
+    expect(JSON.stringify(response.body)).not.toContain('must-not-leak');
+    expect(prisma.loan.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: {}, skip: 0, take: 20 }),
+    );
+    await request(app.getHttpServer())
+      .get(`/api/loans?userId=${userId}&status=ACTIVE`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(prisma.loan.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where: { userId, status: 'ACTIVE' } }),
+    );
+  });
+
+  it('rejects invalid history filters and attempts to override the current user', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    const token = await createAccessToken(app, 'USER');
+    for (const query of [
+      'page=0',
+      'limit=101',
+      'status=OVERDUE',
+      'page=1.5',
+      `userId=${userId}`,
+    ]) {
+      await request(app.getHttpServer())
+        .get(`/api/loans/me?${query}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(400);
+    }
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    const admin = await createAccessToken(app, 'ADMIN');
+    await request(app.getHttpServer())
+      .get('/api/loans?userId=invalid')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(400);
+    expect(prisma.loan.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty history with default pagination', async () => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    const token = await createAccessToken(app, 'USER');
+    await request(app.getHttpServer())
+      .get('/api/loans/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect({
+        data: [],
+        pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+      });
+  });
+
   it('requires authentication and validates the game-copy ID for borrowing', async () => {
     await request(app.getHttpServer())
       .post('/api/loans')
@@ -687,6 +866,27 @@ describe('BoardRent API (e2e)', () => {
       'access-token': [],
     });
     expect(response.body.paths[loansPath].post.responses['409']).toBeDefined();
+    const adminHistory = response.body.paths[loansPath].get;
+    const myHistory = response.body.paths[`${loansPath}/me`].get;
+    expect(adminHistory.responses['403']).toBeDefined();
+    for (const operation of [adminHistory, myHistory]) {
+      expect(operation.security).toContainEqual({ 'access-token': [] });
+      expect(
+        operation.parameters.map(({ name }: { name: string }) => name),
+      ).toEqual(expect.arrayContaining(['page', 'limit', 'status']));
+    }
+    expect(
+      adminHistory.parameters.map(({ name }: { name: string }) => name),
+    ).toContain('userId');
+    expect(
+      myHistory.parameters.map(({ name }: { name: string }) => name),
+    ).not.toContain('userId');
+    const returnOperation =
+      response.body.paths[`${loansPath}/{id}/return`].patch;
+    expect(returnOperation.security).toContainEqual({ 'access-token': [] });
+    for (const status of ['200', '400', '401', '404', '409', '503']) {
+      expect(returnOperation.responses[status]).toBeDefined();
+    }
   });
 
   it('supports game CRUD with its category relation', async () => {
