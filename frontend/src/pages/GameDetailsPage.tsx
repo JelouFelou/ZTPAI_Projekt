@@ -1,9 +1,112 @@
 import { useEffect, useState } from "react";
-import { ApiError, getGame } from "../api";
-import type { Game } from "../api";
+import { ApiError, apiRequest, getGame } from "../api";
+import type { Game, GameCopy, Loan } from "../api";
+import { useAuth } from "../authContext";
+import { navigate } from "../navigation";
 import Link from "../components/Link";
 import { GameArtwork } from "../components/GameCard";
 import { formatDuration, formatPlayers } from "../gameFormatting";
+
+function BorrowAction({ game }: { game: Game }) {
+  const { user, authorized } = useAuth();
+  const userId = user?.id;
+  const [copies, setCopies] = useState<GameCopy[] | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+
+  useEffect(() => {
+    if (!userId || game.availableCopies === 0) return;
+    const controller = new AbortController();
+    apiRequest<GameCopy[]>("/game-copies", { signal: controller.signal })
+      .then((data) => {
+        if (!controller.signal.aborted)
+          setCopies(
+            data.filter((copy) => copy.gameId === game.id && copy.isAvailable),
+          );
+      })
+      .catch((cause) => {
+        if (!controller.signal.aborted)
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Nie można pobrać egzemplarzy.",
+          );
+      });
+    return () => controller.abort();
+  }, [game.id, game.availableCopies, userId, refresh]);
+
+  async function borrow() {
+    const copy = copies?.[0];
+    if (!copy || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await authorized<Loan>("/loans", {
+        method: "POST",
+        body: { gameCopyId: copy.id },
+      });
+      navigate("/loans?new=1");
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Nie udało się wypożyczyć gry.",
+      );
+      setRefresh((value) => value + 1);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!game.availableCopies) return null;
+  if (!user)
+    return (
+      <Link
+        className="button button-primary borrow-button"
+        href={`/login?next=${encodeURIComponent(`/games/${game.id}`)}`}
+      >
+        Zaloguj się, aby wypożyczyć →
+      </Link>
+    );
+  return (
+    <div className="borrow-area">
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      {error && (
+        <button
+          className="button button-secondary"
+          type="button"
+          onClick={() => {
+            setError("");
+            setCopies(null);
+            setRefresh((value) => value + 1);
+          }}
+        >
+          Sprawdź ponownie
+        </button>
+      )}
+      <button
+        className="button button-primary borrow-button"
+        type="button"
+        disabled={busy || !copies?.length}
+        onClick={borrow}
+      >
+        {busy
+          ? "Wypożyczanie…"
+          : copies === null
+            ? "Sprawdzanie egzemplarzy…"
+            : copies.length
+              ? "Wypożycz tę grę →"
+              : "Brak wolnego egzemplarza"}
+      </button>
+      <small>Termin zwrotu: 14 dni. Jedna aktywna gra na konto.</small>
+    </div>
+  );
+}
 
 export default function GameDetailsPage({ id }: { id: string }) {
   const [request, setRequest] = useState<{
@@ -136,6 +239,7 @@ export default function GameDetailsPage({ id }: { id: string }) {
                     </span>
                   </div>
                 </div>
+                <BorrowAction game={game} />
                 <Link
                   className="button button-secondary details-back"
                   href="/games"

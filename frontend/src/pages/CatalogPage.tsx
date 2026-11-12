@@ -370,8 +370,8 @@ export default function CatalogPage({
             </h2>
           </div>
           <p>
-            Przeglądaj katalog i sprawdzaj dostępność. W kolejnych etapach
-            dodamy logowanie, wypożyczanie i zwroty bezpośrednio z tej strony.
+            Przeglądaj katalog, sprawdzaj dostępność i wypożyczaj gry. Swoje
+            wypożyczenia oraz terminy zwrotów znajdziesz w jednym miejscu.
           </p>
         </div>
       </section>

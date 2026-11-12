@@ -47,6 +47,16 @@ Historia obejmuje aktywne i zwrócone wypożyczenia, od najnowszych. Obsługuje 
 
 ## Frontend
 
+Na Windows możesz uruchomić oba serwery jedną komendą z katalogu głównego (po przygotowaniu bazy, migracji, `backend/.env` i zależności):
+
+```powershell
+.\dev.cmd
+```
+
+Otwórz `http://127.0.0.1:5173`. Serwery działają w tle, a logi są w `.boardrent-dev`. Zatrzymasz oba poleceniem `.\dev.cmd stop`. Skrypt nie uruchamia ani nie zatrzymuje PostgreSQL.
+
+Możesz też uruchomić frontend osobno:
+
 ```powershell
 cd frontend
 npm.cmd ci

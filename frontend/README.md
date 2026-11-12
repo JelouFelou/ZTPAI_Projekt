@@ -1,6 +1,6 @@
 ﻿# BoardRent frontend
 
-Publiczny katalog gier planszowych zbudowany w React, TypeScript i Vite.
+Katalog i panel wypożyczeń gier planszowych zbudowany w React, TypeScript i Vite.
 
 ## Uruchomienie lokalne
 
@@ -21,8 +21,10 @@ Jeśli katalog jest pusty, z katalogu `backend` uruchom `npm.cmd run db:seed-dem
 - `/` — strona główna z katalogiem.
 - `/games` — katalog z wyszukiwaniem po tytule lub opisie, filtrem kategorii i paginacją.
 - `/games/:id` — szczegóły gry oraz liczba dostępnych egzemplarzy.
+- `/login` i `/register` — logowanie oraz rejestracja konta.
+- `/loans` — własne wypożyczenia, terminy zwrotu i zwracanie gier.
 
-Filtry, rozmiar strony i numer strony są zapisane w adresie. Można skopiować link do wyników lub wrócić do nich przyciskiem Wstecz w przeglądarce. Na tym etapie frontend jest publiczny; logowanie, wypożyczanie, zwroty i panel administratora są kolejnymi punktami planu.
+Filtry, rozmiar strony i numer strony są zapisane w adresie. Można skopiować link do wyników lub wrócić do nich przyciskiem Wstecz w przeglądarce. Po zalogowaniu można wypożyczyć dostępny egzemplarz ze strony szczegółów gry. Sesja jest zapisana tylko w bieżącej karcie przeglądarki i wygasa po 15 minutach; po wygaśnięciu trzeba zalogować się ponownie. Panel administratora jest kolejnym etapem planu.
 
 ## Kontrole
 

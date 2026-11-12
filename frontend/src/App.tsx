@@ -1,14 +1,21 @@
 import { useSyncExternalStore } from "react";
 import Link from "./components/Link";
+import { AuthProvider } from "./auth";
+import { useAuth } from "./authContext";
 import { currentRoute, subscribe } from "./navigation";
 import CatalogPage from "./pages/CatalogPage";
 import GameDetailsPage from "./pages/GameDetailsPage";
+import AuthPage from "./pages/AuthPage";
+import LoansPage from "./pages/LoansPage";
 import "./App.css";
 
 function App() {
   const route = useSyncExternalStore(subscribe, currentRoute);
   const path = route.split("?")[0];
   const gameId = /^\/games\/([^/]+)$/.exec(path)?.[1];
+  const { user, logout } = useAuth();
+  const next =
+    new URLSearchParams(route.split("?")[1] ?? "").get("next") ?? "/loans";
 
   return (
     <div className="app-shell">
@@ -31,10 +38,27 @@ function App() {
             >
               Katalog gier
             </Link>
+            {user && (
+              <Link
+                href="/loans"
+                aria-current={path === "/loans" ? "page" : undefined}
+              >
+                Moje wypożyczenia
+              </Link>
+            )}
           </nav>
-          <Link className="header-action" href="/games">
-            Odkryj gry <span aria-hidden="true">↗</span>
-          </Link>
+          {user ? (
+            <div className="header-account">
+              <span>Cześć, {user.firstName}</span>
+              <button type="button" onClick={logout}>
+                Wyloguj
+              </button>
+            </div>
+          ) : (
+            <Link className="header-action" href="/login">
+              Zaloguj się <span aria-hidden="true">↗</span>
+            </Link>
+          )}
         </div>
       </header>
 
@@ -42,6 +66,14 @@ function App() {
         <CatalogPage route={route} showHero={path === "/"} />
       ) : gameId ? (
         <GameDetailsPage key={gameId} id={gameId} />
+      ) : path === "/login" || path === "/register" ? (
+        <AuthPage
+          key={path}
+          mode={path === "/login" ? "login" : "register"}
+          next={next}
+        />
+      ) : path === "/loans" ? (
+        <LoansPage route={route} />
       ) : (
         <main className="container not-found">
           <p className="eyebrow">404 · Nie znaleziono strony</p>
@@ -66,4 +98,10 @@ function App() {
   );
 }
 
-export default App;
+export default function AppWithAuth() {
+  return (
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  );
+}
