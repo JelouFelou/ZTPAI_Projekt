@@ -18,6 +18,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:create-admin": "node --env-file=.env scripts/create-admin.mjs",
+    "db:seed-demo": "node --env-file=.env scripts/seed-demo-catalog.mjs",
     "test:db": "vitest run --config ./vitest.config.db.ts",
     "lint": "oxlint --type-aware src/ test/",
     "test": "vitest run",

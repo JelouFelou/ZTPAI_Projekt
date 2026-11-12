@@ -7,8 +7,8 @@ REST API aplikacji BoardRent zbudowane w NestJS i TypeScript.
 Z katalogu `backend` skopiuj przykładową konfigurację i ustaw własny sekret JWT:
 
 ```powershell
-npm ci
-Copy-Item .env.example .env
+npm.cmd ci
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
 [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 ```
 
@@ -16,14 +16,17 @@ Wstaw wygenerowany ciąg jako `AUTH_JWT_SECRET` w `backend/.env`, a następnie u
 
 ```powershell
 Set-Location ..
-docker compose up -d db
 Set-Location backend
-npm run db:generate
-npm run db:migrate
-npm run start:dev
+npm.cmd run db:generate
+npm.cmd run db:migrate
+npm.cmd run start:dev
 ```
 
+Jeśli nie masz uruchomionego PostgreSQL na porcie `5432`, przed migracjami wykonaj w katalogu głównym `docker compose up -d db`. Przy istniejącej bazie pomiń ten krok i ustaw odpowiedni `DATABASE_URL` w `.env`.
+
 API domyślnie nasłuchuje na porcie `3000`; można go zmienić zmienną `PORT`. Aplikacja nie uruchomi się z pustym lub krótszym niż 32 bajty sekretem. Wartości w `.env.example` są przeznaczone wyłącznie do lokalnego developmentu.
+
+Po migracjach możesz dodać 14 przykładowych gier i egzemplarze dla widoku katalogu: `npm.cmd run db:seed-demo`. Skrypt można uruchomić ponownie; nie zmienia istniejących wpisów. To dane demonstracyjne do pracy lokalnej.
 
 ## Dostępne skrypty
 

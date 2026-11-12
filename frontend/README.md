@@ -1,32 +1,32 @@
-# React + TypeScript + Vite
+﻿# BoardRent frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Publiczny katalog gier planszowych zbudowany w React, TypeScript i Vite.
 
-Currently, two official plugins are available:
+## Uruchomienie lokalne
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Uruchom PostgreSQL i backend według głównego `README.md`. W osobnym terminalu:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```powershell
+cd frontend
+npm.cmd ci
+npm.cmd run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Otwórz adres wypisany przez Vite (zwykle `http://localhost:5173`). Serwer Vite przekazuje żądania `/api` do backendu pod `http://127.0.0.1:3000`, więc lokalnie nie trzeba ustawiać CORS ani adresu API. Przy innym adresie backendu zmień proxy w `vite.config.ts`. Dla osobno hostowanego frontendu ustaw `VITE_API_BASE_URL` przed budowaniem, np. `https://example.com/api`. Jeśli frontend i API mają różne domeny, skonfiguruj również CORS w backendzie albo wspólny reverse proxy.
+
+Jeśli katalog jest pusty, z katalogu `backend` uruchom `npm.cmd run db:seed-demo` po zastosowaniu migracji. Skrypt dodaje 14 przykładowych gier i ich egzemplarze, więc można też sprawdzić paginację; można uruchamiać go ponownie bez tworzenia tych samych wpisów.
+
+## Dostępne widoki
+
+- `/` — strona główna z katalogiem.
+- `/games` — katalog z wyszukiwaniem po tytule lub opisie, filtrem kategorii i paginacją.
+- `/games/:id` — szczegóły gry oraz liczba dostępnych egzemplarzy.
+
+Filtry, rozmiar strony i numer strony są zapisane w adresie. Można skopiować link do wyników lub wrócić do nich przyciskiem Wstecz w przeglądarce. Na tym etapie frontend jest publiczny; logowanie, wypożyczanie, zwroty i panel administratora są kolejnymi punktami planu.
+
+## Kontrole
+
+```powershell
+npm.cmd run build
+npm.cmd run lint
+```

@@ -11,15 +11,16 @@ Aplikacja umożliwia przeglądanie katalogu gier, sprawdzanie dostępności egze
 Skopiuj przykładową konfigurację, ustaw własny sekret JWT i uruchom PostgreSQL oraz API:
 
 ```powershell
-Copy-Item backend/.env.example backend/.env
+if (!(Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
 # W backend/.env ustaw AUTH_JWT_SECRET na losowy sekret o długości co najmniej 32 bajtów.
-docker compose up -d db
 cd backend
-npm ci
-npm run db:generate
-npm run db:migrate
-npm run start:dev
+npm.cmd ci
+npm.cmd run db:generate
+npm.cmd run db:migrate
+npm.cmd run start:dev
 ```
+
+Jeśli nie masz uruchomionego PostgreSQL na porcie `5432`, przed migracjami wykonaj w katalogu głównym `docker compose up -d db`. Przy istniejącej bazie pomiń ten krok i ustaw odpowiedni `DATABASE_URL` w `backend/.env`.
 
 API domyślnie działa pod `http://localhost:3000`. `.env.example` zawiera ustawienia lokalne; nie używaj ich w środowisku produkcyjnym. Instrukcje generowania sekretu znajdują się w [backend/README.md](./backend/README.md).
 
@@ -48,11 +49,13 @@ Historia obejmuje aktywne i zwrócone wypożyczenia, od najnowszych. Obsługuje 
 
 ```powershell
 cd frontend
-npm ci
-npm run dev
+npm.cmd ci
+npm.cmd run dev
 ```
 
 Vite wypisze lokalny adres aplikacji w terminalu.
+
+Na stronie głównej i pod `/games` można przeglądać katalog, wyszukiwać gry, filtrować po kategorii i otwierać szczegóły. Frontend pobiera dane z backendu przez lokalne proxy Vite. Jeśli baza nie zawiera jeszcze gier, po migracjach uruchom z katalogu `backend` `npm.cmd run db:seed-demo`, aby dodać przykładowy katalog do testów. Więcej informacji znajduje się w [frontend/README.md](./frontend/README.md).
 
 Tworzenie konta administratora i uruchamianie testów opisuje [backend/README.md](./backend/README.md).
 API egzemplarzy zwraca `isAvailable`, a API gier `availableCopies`. Status `AVAILABLE` opisuje stan egzemplarza; samo wypożyczenie nie zmienia go.
