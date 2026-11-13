@@ -7,6 +7,7 @@ import CatalogPage from "./pages/CatalogPage";
 import GameDetailsPage from "./pages/GameDetailsPage";
 import AuthPage from "./pages/AuthPage";
 import LoansPage from "./pages/LoansPage";
+import AdminPage from "./pages/AdminPage";
 import "./App.css";
 
 function App() {
@@ -46,6 +47,14 @@ function App() {
                 Moje wypożyczenia
               </Link>
             )}
+            {user?.role === "ADMIN" && (
+              <Link
+                href="/admin"
+                aria-current={path === "/admin" ? "page" : undefined}
+              >
+                Panel admina
+              </Link>
+            )}
           </nav>
           {user ? (
             <div className="header-account">
@@ -74,6 +83,8 @@ function App() {
         />
       ) : path === "/loans" ? (
         <LoansPage route={route} />
+      ) : path === "/admin" ? (
+        <AdminPage route={route} />
       ) : (
         <main className="container not-found">
           <p className="eyebrow">404 · Nie znaleziono strony</p>

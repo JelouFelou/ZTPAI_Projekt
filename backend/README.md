@@ -102,7 +102,7 @@ Swagger UI jest dostępne pod `http://localhost:3000/api/docs`; surowy dokument 
 Po migracjach ustaw lokalnie w `backend/.env` wartości `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12–128 znaków), `ADMIN_FIRST_NAME` i `ADMIN_LAST_NAME` (1–100 znaków). Następnie w katalogu `backend` uruchom:
 
 ```powershell
-npm run db:create-admin
+npm.cmd run db:create-admin
 ```
 
 Skrypt tworzy konto `ADMIN` z hasłem haszowanym Argon2id. Istniejącego konta nie zmienia ani nie podnosi jego uprawnień. Po utworzeniu usuń hasło administratora z `.env`; logowanie działa przez zwykły endpoint. Nie dodawaj `.env` do repozytorium.

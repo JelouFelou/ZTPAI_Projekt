@@ -65,7 +65,7 @@ npm.cmd run dev
 
 Vite wypisze lokalny adres aplikacji w terminalu.
 
-Na stronie głównej i pod `/games` można przeglądać katalog, wyszukiwać gry, filtrować po kategorii i otwierać szczegóły. Frontend pobiera dane z backendu przez lokalne proxy Vite. Jeśli baza nie zawiera jeszcze gier, po migracjach uruchom z katalogu `backend` `npm.cmd run db:seed-demo`, aby dodać przykładowy katalog do testów. Więcej informacji znajduje się w [frontend/README.md](./frontend/README.md).
+Na stronie głównej i pod `/games` można przeglądać katalog, wyszukiwać gry, filtrować po kategorii i otwierać szczegóły. Zalogowany użytkownik może wypożyczać i zwracać gry pod `/loans`, a administrator zarządza grami, kategoriami i egzemplarzami pod `/admin`. Frontend pobiera dane z backendu przez lokalne proxy Vite. Jeśli baza nie zawiera jeszcze gier, po migracjach uruchom z katalogu `backend` `npm.cmd run db:seed-demo`, aby dodać przykładowy katalog do testów. Więcej informacji znajduje się w [frontend/README.md](./frontend/README.md).
 
 Tworzenie konta administratora i uruchamianie testów opisuje [backend/README.md](./backend/README.md).
 API egzemplarzy zwraca `isAvailable`, a API gier `availableCopies`. Status `AVAILABLE` opisuje stan egzemplarza; samo wypożyczenie nie zmienia go.

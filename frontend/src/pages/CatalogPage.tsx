@@ -104,6 +104,7 @@ export default function CatalogPage({
   const draft = draftState.query === filters.q ? draftState.value : filters.q;
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesError, setCategoriesError] = useState(false);
+  const [categoryRetry, setCategoryRetry] = useState(0);
   const [request, setRequest] = useState<{
     key: string;
     data: PaginatedGames | null;
@@ -123,7 +124,7 @@ export default function CatalogPage({
         if (!controller.signal.aborted) setCategoriesError(true);
       });
     return () => controller.abort();
-  }, []);
+  }, [categoryRetry]);
   useEffect(() => {
     const controller = new AbortController();
     getGames(search, controller.signal)
@@ -226,6 +227,15 @@ export default function CatalogPage({
         {categoriesError && (
           <p className="filter-hint" role="status">
             Nie udało się pobrać kategorii. Wyszukiwanie gier nadal działa.
+            <button
+              type="button"
+              onClick={() => {
+                setCategoriesError(false);
+                setCategoryRetry((value) => value + 1);
+              }}
+            >
+              Spróbuj ponownie
+            </button>
           </p>
         )}
         <div className="results-bar">

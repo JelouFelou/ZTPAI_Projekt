@@ -19,7 +19,7 @@ export default function LoansPage({ route }: { route: string }) {
       ? requestedPage
       : 1;
   const [request, setRequest] = useState<{
-    page: number;
+    key: string;
     data: PaginatedLoans | null;
     error: string;
   } | null>(null);
@@ -30,7 +30,8 @@ export default function LoansPage({ route }: { route: string }) {
   const [success, setSuccess] = useState(
     params.has("new") ? "Gra została wypożyczona." : "",
   );
-  const loading = request?.page !== page || (!request.data && !request.error);
+  const requestKey = `${userId ?? ""}:${page}:${refresh}`;
+  const loading = request?.key !== requestKey;
   const data = !loading ? request?.data : null;
   const error = !loading ? request?.error : "";
 
@@ -46,13 +47,13 @@ export default function LoansPage({ route }: { route: string }) {
       .then((result) => {
         if (!controller.signal.aborted) {
           setNow(Date.now());
-          setRequest({ page, data: result, error: "" });
+          setRequest({ key: requestKey, data: result, error: "" });
         }
       })
       .catch((cause) => {
         if (!controller.signal.aborted)
           setRequest({
-            page,
+            key: requestKey,
             data: null,
             error:
               cause instanceof Error
@@ -61,7 +62,7 @@ export default function LoansPage({ route }: { route: string }) {
           });
       });
     return () => controller.abort();
-  }, [userId, authorized, page, refresh]);
+  }, [userId, authorized, page, requestKey]);
 
   async function returnLoan(loan: Loan) {
     if (

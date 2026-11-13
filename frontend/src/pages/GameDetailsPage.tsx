@@ -48,6 +48,7 @@ function BorrowAction({ game }: { game: Game }) {
       });
       navigate("/loans?new=1");
     } catch (cause) {
+      setCopies(null);
       setError(
         cause instanceof Error
           ? cause.message
