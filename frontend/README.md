@@ -23,7 +23,7 @@ Jeśli katalog jest pusty, z katalogu `backend` uruchom `npm.cmd run db:seed-dem
 - `/games/:id` — szczegóły gry oraz liczba dostępnych egzemplarzy.
 - `/login` i `/register` — logowanie oraz rejestracja konta.
 - `/loans` — własne wypożyczenia, terminy zwrotu i zwracanie gier.
-- `/admin` — panel administratora: dodawanie, edycja i usuwanie gier, kategorii oraz egzemplarzy.
+- `/admin` — panel administratora: dodawanie, edycja i usuwanie gier, kategorii oraz egzemplarzy; zakładka „Wypożyczenia” pokazuje historię wszystkich użytkowników z filtrami i paginacją po stronie API.
 
 Filtry, rozmiar strony i numer strony są zapisane w adresie. Można skopiować link do wyników lub wrócić do nich przyciskiem Wstecz w przeglądarce. Po zalogowaniu można wypożyczyć dostępny egzemplarz ze strony szczegółów gry. Sesja jest zapisana tylko w bieżącej karcie przeglądarki i wygasa po 15 minutach; po wygaśnięciu trzeba zalogować się ponownie. Panel administratora wymaga konta z rolą `ADMIN`. Utwórz je zgodnie z [instrukcją backendu](../backend/README.md#administrator), a następnie zaloguj się na stronie. Formularze wyświetlają błędy walidacji, odmowy dostępu i konfliktów zapisu; przed usunięciem wpisu proszą o potwierdzenie.
 

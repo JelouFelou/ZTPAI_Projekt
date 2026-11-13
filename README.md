@@ -43,7 +43,7 @@ Zalogowany użytkownik może wypożyczyć dostępny egzemplarz przez `POST /api/
 
 Zwrot przez `PATCH /api/loans/:id/return` zapisuje `RETURNED` i datę `returnedAt`. Ponowny zwrot zwraca `409`; nieistniejące i cudze wypożyczenia zwracają `404`. Dostępność jest przeliczana automatycznie, z uwzględnieniem stanu egzemplarza.
 
-Historia obejmuje aktywne i zwrócone wypożyczenia, od najnowszych. Obsługuje `status=ACTIVE|RETURNED`, `page` i `limit`; administrator może dodatkowo filtrować po `userId`.
+Historia obejmuje aktywne i zwrócone wypożyczenia, od najnowszych. Obsługuje `status=ACTIVE|RETURNED`, `page` i `limit`; administrator może dodatkowo filtrować po `userId` oraz po przeterminowaniu (`overdue=true|false`). Panel `/admin?tab=loans` pokazuje tę historię po 20 wpisów na stronę.
 
 ## Frontend
 

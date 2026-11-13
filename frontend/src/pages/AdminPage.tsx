@@ -3,7 +3,9 @@ import { getAllGames, getCategories, getGameCopies } from "../api";
 import type { Category, Game, GameCopy } from "../api";
 import { useAuth } from "../authContext";
 import { CategoryForm, CopyForm, GameForm } from "../components/AdminForms";
+import AdminTabs from "../components/AdminTabs";
 import Link from "../components/Link";
+import AdminLoansPage from "./AdminLoansPage";
 
 type Section = "games" | "categories" | "copies";
 type Catalog = { games: Game[]; categories: Category[]; copies: GameCopy[] };
@@ -21,6 +23,7 @@ const copyStatus: Record<GameCopy["status"], string> = {
 export default function AdminPage({ route }: { route: string }) {
   const { user, authorized } = useAuth();
   const tab = new URLSearchParams(route.split("?")[1] ?? "").get("tab");
+  const isLoansTab = tab === "loans";
   const section: Section =
     tab === "categories" || tab === "copies" ? tab : "games";
   const [revision, setRevision] = useState(0);
@@ -46,7 +49,7 @@ export default function AdminPage({ route }: { route: string }) {
   const error = loading ? "" : request.error;
 
   useEffect(() => {
-    if (user?.role !== "ADMIN") return;
+    if (user?.role !== "ADMIN" || isLoansTab) return;
     const controller = new AbortController();
     Promise.all([
       getAllGames(controller.signal),
@@ -73,7 +76,7 @@ export default function AdminPage({ route }: { route: string }) {
           });
       });
     return () => controller.abort();
-  }, [user?.id, user?.role, requestKey]);
+  }, [user?.id, user?.role, requestKey, isLoansTab]);
 
   async function mutate(
     path: string,
@@ -154,6 +157,8 @@ export default function AdminPage({ route }: { route: string }) {
       </main>
     );
 
+  if (isLoansTab) return <AdminLoansPage route={route} />;
+
   const currentEdit = editing?.section === section ? editing.id : null;
   const filteredGames =
     data?.games.filter((game) =>
@@ -184,18 +189,7 @@ export default function AdminPage({ route }: { route: string }) {
         <h1>Panel administratora</h1>
         <p>Dodawaj i aktualizuj gry, kategorie oraz fizyczne egzemplarze.</p>
       </div>
-      <nav className="admin-tabs" aria-label="Sekcje panelu">
-        {(["games", "categories", "copies"] as Section[]).map((tab) => (
-          <Link
-            key={tab}
-            href={`/admin?tab=${tab}`}
-            className={section === tab ? "admin-tabs__active" : ""}
-            aria-current={section === tab ? "page" : undefined}
-          >
-            {labels[tab]}
-          </Link>
-        ))}
-      </nav>
+      <AdminTabs current={section} />
       {notice && (
         <p className="notice" role="status">
           {notice}

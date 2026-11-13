@@ -507,6 +507,62 @@ describe('BoardRent API (e2e)', () => {
     );
   });
 
+  it('filters and paginates overdue loans for ADMIN only', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    prisma.loan.count.mockResolvedValue(42);
+    const admin = await createAccessToken(app, 'ADMIN');
+    const response = await request(app.getHttpServer())
+      .get('/api/loans?overdue=true&page=2&limit=20')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+    expect(response.body.pagination).toEqual({
+      page: 2,
+      limit: 20,
+      total: 42,
+      totalPages: 3,
+    });
+    const where = prisma.loan.findMany.mock.calls.at(-1)?.[0]?.where;
+    expect(where).toEqual({
+      status: 'ACTIVE',
+      dueAt: { lt: expect.any(Date) },
+    });
+    expect(prisma.loan.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ where, skip: 20, take: 20 }),
+    );
+    expect(prisma.loan.count).toHaveBeenLastCalledWith({ where });
+
+    await request(app.getHttpServer())
+      .get('/api/loans?status=ACTIVE&overdue=false&page=1&limit=20')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(200);
+    expect(prisma.loan.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { status: 'ACTIVE', dueAt: { gte: expect.any(Date) } },
+        skip: 0,
+        take: 20,
+      }),
+    );
+
+    await request(app.getHttpServer())
+      .get('/api/loans?status=RETURNED&overdue=true')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/api/loans?overdue=maybe')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(400);
+    prisma.user.findUnique.mockResolvedValue(user);
+    const member = await createAccessToken(app, 'USER');
+    await request(app.getHttpServer())
+      .get('/api/loans?overdue=true')
+      .set('Authorization', `Bearer ${member}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/api/loans/me?overdue=true')
+      .set('Authorization', `Bearer ${member}`)
+      .expect(400);
+  });
+
   it('rejects invalid history filters and attempts to override the current user', async () => {
     prisma.user.findUnique.mockResolvedValue(user);
     const token = await createAccessToken(app, 'USER');

@@ -90,6 +90,65 @@ describe('Borrowing history', () => {
     });
   });
 
+  it('filters overdue loans in the database before pagination', async () => {
+    const { service, prisma } = setup();
+    const before = Date.now();
+    const result = await service.findAllHistory({
+      page: 2,
+      limit: 20,
+      overdue: true,
+    });
+    const after = Date.now();
+    expect(prisma.loan.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: 'ACTIVE', dueAt: { lt: expect.any(Date) } },
+        skip: 20,
+        take: 20,
+      }),
+    );
+    const where = prisma.loan.findMany.mock.calls[0][0].where;
+    expect(where.dueAt.lt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(where.dueAt.lt.getTime()).toBeLessThanOrEqual(after);
+    expect(prisma.loan.count).toHaveBeenCalledWith({ where });
+    expect(result.pagination).toEqual({
+      page: 2,
+      limit: 20,
+      total: 1,
+      totalPages: 1,
+    });
+  });
+
+  it('keeps non-overdue active loans separate from overdue loans', async () => {
+    const { service, prisma } = setup();
+    await service.findAllHistory({
+      page: 1,
+      limit: 20,
+      status: 'ACTIVE',
+      overdue: false,
+    });
+    const where = prisma.loan.findMany.mock.calls[0][0].where;
+    expect(where).toEqual({
+      status: 'ACTIVE',
+      dueAt: { gte: expect.any(Date) },
+    });
+    expect(prisma.loan.count).toHaveBeenCalledWith({ where });
+  });
+
+  it('rejects an overdue filter combined with returned loans', async () => {
+    const { service, prisma } = setup();
+    await expect(
+      service.findAllHistory({
+        page: 1,
+        limit: 20,
+        status: 'RETURNED',
+        overdue: true,
+      }),
+    ).rejects.toThrow(
+      'The overdue filter cannot be combined with returned loans',
+    );
+    expect(prisma.loan.findMany).not.toHaveBeenCalled();
+  });
+
   it('returns an empty page without losing the total count', async () => {
     const { service, prisma } = setup();
     prisma.loan.findMany.mockResolvedValue([]);

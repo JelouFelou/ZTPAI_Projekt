@@ -69,6 +69,19 @@ export interface PaginatedLoans {
   pagination: PaginatedGames["pagination"];
 }
 
+export interface AdminLoan extends Loan {
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+}
+
+export interface AdminPaginatedLoans extends Omit<PaginatedLoans, "data"> {
+  data: AdminLoan[];
+}
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string | null;

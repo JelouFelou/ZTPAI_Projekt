@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -49,10 +50,23 @@ export class LoansService {
   async findAllHistory(
     query: AdminListLoansQueryDto,
   ): Promise<AdminLoanListResponseDto> {
+    if (query.status === LoanStatus.RETURNED && query.overdue !== undefined) {
+      throw new BadRequestException(
+        'The overdue filter cannot be combined with returned loans',
+      );
+    }
+    const now = new Date();
     const { loans, pagination } = await this.findHistoryPage(
       {
         ...(query.userId ? { userId: query.userId } : {}),
-        ...(query.status ? { status: query.status } : {}),
+        ...(query.overdue !== undefined
+          ? {
+              status: LoanStatus.ACTIVE,
+              dueAt: query.overdue ? { lt: now } : { gte: now },
+            }
+          : query.status
+            ? { status: query.status }
+            : {}),
       },
       query,
     );
