@@ -47,7 +47,20 @@ Zwrot przez `PATCH /api/loans/:id/return` zapisuje `RETURNED` i datę `returnedA
 
 Historia obejmuje aktywne i zwrócone wypożyczenia, od najnowszych. Obsługuje `status=ACTIVE|RETURNED`, `page` i `limit`; administrator może dodatkowo filtrować po `userId` oraz po przeterminowaniu (`overdue=true|false`). Panel `/admin?tab=loans` pokazuje tę historię po 20 wpisów na stronę.
 
-## Frontend
+## Reguły biznesowe
+
+Reguły są egzekwowane przez backend i obowiązują również przy bezpośrednim wywołaniu API:
+
+| Reguła | Miejsce realizacji | Ochrona i wynik naruszenia |
+| --- | --- | --- |
+| Maksymalnie jedno aktywne wypożyczenie na użytkownika | [`LoansService.borrowInTransaction`](backend/src/loans/loans.service.ts), stała `MAX_ACTIVE_LOANS = 1` w [`loan-policy.ts`](backend/src/loans/loan-policy.ts) | Kontrola liczby wypożyczeń w transakcji `Serializable` i częściowy indeks unikalny dla użytkownika w [migracji](backend/prisma/migrations/20261110220000_unique_active_user_loan/migration.sql); naruszenie zwraca `409`. |
+| Można wypożyczyć tylko dostępny, niewypożyczony egzemplarz | [`LoansService.borrowInTransaction`](backend/src/loans/loans.service.ts) | Wymagane `GameCopy.status = AVAILABLE` i brak aktywnego wypożyczenia tej kopii. Transakcja oraz [częściowy indeks unikalny dla egzemplarza](backend/prisma/migrations/20261108220000_unique_active_copy_loan/migration.sql) chronią również przed równoczesnymi żądaniami; naruszenie zwraca `409`. |
+| Zakończonego wypożyczenia nie można ponownie zwrócić | [`LoansService.returnLoan`](backend/src/loans/loans.service.ts) | Zwrot wymaga własnego wypożyczenia w stanie `ACTIVE`; ponowne wywołanie daje `409`, nie nadpisuje daty zwrotu. Transakcja chroni przed równoczesnym zwrotem. |
+| Egzemplarza z historią wypożyczeń nie można przypisać do innej gry | [`GameCopiesService.update`](backend/src/game-copies/game-copies.service.ts) | Przy zmianie `gameId` sprawdzana jest cała historia wypożyczeń w transakcji `Serializable`; naruszenie zwraca `409`. Pozostałe edycje oraz pozostawienie tego samego `gameId` są dozwolone. |
+
+Blokada nowego wypożyczenia przy zaległej grze jest dodatkowym sprawdzeniem tej samej sytuacji co limit jednego aktywnego wypożyczenia — nie jest liczona jako piąta niezależna reguła. Okres wypożyczenia nadal wynosi **14 dni**. Reguły sprawdzają [testy serwisu](backend/src/loans/loans.service.spec.ts), [testy zwrotów](backend/src/loans/loan-returns.spec.ts), [testy API](backend/test/app.e2e-spec.ts) i [testy PostgreSQL](backend/test/borrowing.db-spec.ts).
+
+## Uruchomienie frontendu
 
 ### Uruchomienie całej aplikacji w Docker Compose
 

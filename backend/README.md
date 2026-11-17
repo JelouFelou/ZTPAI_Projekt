@@ -134,6 +134,8 @@ Skrypt tworzy konto `ADMIN` z hasłem haszowanym Argon2id. Istniejącego konta n
 
 ## Weryfikacja
 
+Opis czterech niezależnych reguł biznesowych, miejsc ich realizacji i ochrony transakcyjnej znajduje się w [głównym README](../README.md#reguły-biznesowe). Kontrola zaległego wypożyczenia nie stanowi osobnej reguły niezależnej od limitu jednej aktywnej gry. W kodzie sprawdzono limit użytkownika, dostępność egzemplarza, blokadę ponownego zwrotu i blokadę zmiany gry dla egzemplarza z historią; wszystkie cztery są egzekwowane przez API.
+
 ```powershell
 npm test
 npm run test:e2e
