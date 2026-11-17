@@ -9,6 +9,7 @@ import AuthPage from "./pages/AuthPage";
 import LoansPage from "./pages/LoansPage";
 import AdminPage from "./pages/AdminPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import HeaderSearch from "./components/HeaderSearch";
 import "./App.css";
 
 function App() {
@@ -33,6 +34,7 @@ function App() {
             </span>
             Board<span>Rent</span>
           </Link>
+          <HeaderSearch route={route} />
           <nav className="header-nav" aria-label="Nawigacja główna">
             <Link
               href="/games"

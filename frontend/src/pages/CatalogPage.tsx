@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
 import { getCategories, getGames } from "../api";
 import type { Category, PaginatedGames } from "../api";
 import Link from "../components/Link";
@@ -102,11 +101,6 @@ export default function CatalogPage({
   const filters = readFilters(route);
   const pageSize = catalogPageSize(filters.limit, columns);
   const search = searchFor({ ...filters, limit: pageSize });
-  const [draftState, setDraftState] = useState({
-    query: filters.q,
-    value: filters.q,
-  });
-  const draft = draftState.query === filters.q ? draftState.value : filters.q;
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoriesError, setCategoriesError] = useState(false);
   const [categoryRetry, setCategoryRetry] = useState(0);
@@ -186,10 +180,6 @@ export default function CatalogPage({
   function changeFilters(next: Partial<typeof filters>) {
     navigate(`/games${searchFor({ ...filters, ...next, page: 1 })}`);
   }
-  function submitSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    changeFilters({ q: draft.trim() });
-  }
   const total = result?.pagination.total ?? 0;
   const page = result?.pagination.page ?? filters.page;
   const totalPages = result?.pagination.totalPages ?? 0;
@@ -218,25 +208,8 @@ export default function CatalogPage({
             ✳
           </span>
         </div>
-        <form className="filter-bar" onSubmit={submitSearch} role="search">
-          <label className="search-field">
-            <span className="field-label">Szukaj gry</span>
-            <span className="search-control">
-              <span className="search-icon" aria-hidden="true">
-                ⌕
-              </span>
-              <input
-                type="search"
-                value={draft}
-                onChange={(event) =>
-                  setDraftState({ query: filters.q, value: event.target.value })
-                }
-                placeholder="Tytuł lub opis gry…"
-                maxLength={200}
-              />
-            </span>
-          </label>
-          <label className="category-field">
+        <div className="catalog-filters">
+          <label className="category-field catalog-category">
             <span className="field-label">Kategoria</span>
             <select
               value={filters.categoryId}
@@ -258,10 +231,7 @@ export default function CatalogPage({
                 )}
             </select>
           </label>
-          <button className="button button-primary filter-submit" type="submit">
-            Szukaj <span aria-hidden="true">→</span>
-          </button>
-        </form>
+        </div>
         {categoriesError && (
           <p className="filter-hint" role="status">
             Nie udało się pobrać kategorii. Wyszukiwanie gier nadal działa.
