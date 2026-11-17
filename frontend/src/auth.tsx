@@ -5,19 +5,14 @@ import type { AuthResponse, User } from "./api";
 import { AuthContext } from "./authContext";
 
 const STORAGE_KEY = "boardrent-session";
-type Session = { token: string; expiresAt: number; user: User };
+type Session = { token: string; user: User };
 
 function readSession(): Session | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const value: Session = JSON.parse(raw);
-    if (
-      typeof value.token === "string" &&
-      value.expiresAt > Date.now() &&
-      value.user?.id
-    )
-      return value;
+    if (typeof value.token === "string" && value.user?.id) return value;
   } catch {
     /* corrupted storage */
   }
@@ -34,7 +29,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const save = useCallback((response: AuthResponse) => {
     const next = {
       token: response.accessToken,
-      expiresAt: Date.now() + response.expiresIn * 1000,
       user: response.user,
     };
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -68,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       path: string,
       options: { method?: string; body?: unknown; signal?: AbortSignal } = {},
     ) => {
-      if (!session || session.expiresAt <= Date.now()) {
+      if (!session) {
         logout();
         throw new ApiError("Sesja wygasła. Zaloguj się ponownie.", 401);
       }
@@ -83,13 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const token = session?.token;
-  const expiresAt = session?.expiresAt;
   useEffect(() => {
-    if (!token || !expiresAt) return;
-    const timeout = window.setTimeout(
-      logout,
-      Math.max(0, expiresAt - Date.now()),
-    );
+    if (!token) return;
     const controller = new AbortController();
     apiRequest<User>("/auth/me", { token, signal: controller.signal })
       .then((user) =>
@@ -106,10 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           logout();
       });
     return () => {
-      clearTimeout(timeout);
       controller.abort();
     };
-  }, [token, expiresAt, logout]);
+  }, [token, logout]);
 
   return (
     <AuthContext.Provider

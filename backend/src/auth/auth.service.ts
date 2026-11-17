@@ -11,7 +11,6 @@ import type { AuthUser } from './auth-user.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
 
-const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const DUMMY_PASSWORD_HASH =
   '$argon2id$v=19$m=65536,t=3,p=4$f+YbNgD02st4wUt+BlcIww$O4DUd6cpfLEj7tTkulSk7w3zhiMpyABjKBiK0w1VcWs';
 
@@ -98,7 +97,7 @@ export class AuthService {
     return {
       accessToken,
       tokenType: 'Bearer' as const,
-      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      expiresIn: null,
       user: this.toUserResponse(user),
     };
   }

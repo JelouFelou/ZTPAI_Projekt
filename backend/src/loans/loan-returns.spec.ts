@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { LoanEvents } from '../notifications/loan-events.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LoansService } from './loans.service.js';
 
@@ -35,7 +36,10 @@ function setup() {
     activeLoan,
     transaction,
     prisma,
-    service: new LoansService(prisma as unknown as PrismaService),
+    service: new LoansService(
+      prisma as unknown as PrismaService,
+      new LoanEvents(),
+    ),
   };
 }
 

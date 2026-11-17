@@ -30,7 +30,7 @@ function searchFor({
   if (q) params.set("q", q);
   if (categoryId) params.set("categoryId", categoryId);
   if (page > 1) params.set("page", String(page));
-  if (limit !== PAGE_SIZE) params.set("limit", String(limit));
+  params.set("limit", String(limit));
   return params.size ? `?${params}` : "";
 }
 

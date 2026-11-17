@@ -1,6 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { GameDifficulty } from '@prisma/client';
 import { CategoryResponseDto } from '../../categories/dto/category-response.dto.js';
 import { PaginationResponseDto } from '../../common/api-response.dto.js';
+
+export class ExpectedGameReturnDto {
+  @ApiProperty()
+  inventoryCode!: string;
+
+  @ApiProperty({
+    format: 'date-time',
+    description: 'Scheduled return, not a guaranteed availability date',
+  })
+  dueAt!: string;
+}
 
 export class GameResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -11,6 +23,18 @@ export class GameResponseDto {
 
   @ApiProperty({ nullable: true })
   description!: string | null;
+
+  @ApiProperty({ nullable: true, maxLength: 200 })
+  occasion!: string | null;
+
+  @ApiProperty({ enum: GameDifficulty, nullable: true })
+  difficulty!: GameDifficulty | null;
+
+  @ApiProperty({ nullable: true, maxLength: 2000 })
+  gameplay!: string | null;
+
+  @ApiProperty({ type: [String], maxItems: 6 })
+  highlights!: string[];
 
   @ApiProperty({ minimum: 1 })
   minPlayers!: number;
@@ -32,6 +56,12 @@ export class GameResponseDto {
 
   @ApiProperty({ minimum: 0, description: 'Copies available for borrowing' })
   availableCopies!: number;
+
+  @ApiProperty({ minimum: 0 })
+  borrowedCopies!: number;
+
+  @ApiProperty({ type: [ExpectedGameReturnDto] })
+  expectedReturns!: ExpectedGameReturnDto[];
 
   @ApiProperty({ format: 'date-time' })
   createdAt!: string;

@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { Game } from "../api";
 import Link from "./Link";
+import GameInfoDialog from "./GameInfoDialog";
 import { formatDuration, formatPlayers } from "../gameFormatting";
 
 export function GameArtwork({
@@ -35,16 +37,10 @@ export default function GameCard({
   game: Game;
   index: number;
 }) {
+  const [showInfo, setShowInfo] = useState(false);
   return (
     <article className="game-card">
-      <Link
-        className="game-card__art-link"
-        href={`/games/${game.id}`}
-        tabIndex={-1}
-        aria-hidden="true"
-      >
-        <GameArtwork title={game.title} variant={index} />
-      </Link>
+      <GameArtwork title={game.title} variant={index} />
       <div className="game-card__body">
         <div className="card-topline">
           <span className="category-label">{game.category.name}</span>
@@ -53,12 +49,14 @@ export default function GameCard({
           >
             <span aria-hidden="true" />
             {game.availableCopies
-              ? `${game.availableCopies} dost.`
+              ? `Dostępne: ${game.availableCopies}`
               : "Niedostępna"}
           </span>
         </div>
         <h3>
-          <Link href={`/games/${game.id}`}>{game.title}</Link>
+          <Link className="game-card__link" href={`/games/${game.id}`}>
+            {game.title}
+          </Link>
         </h3>
         <p className="game-card__description">
           {game.description ||
@@ -66,18 +64,30 @@ export default function GameCard({
         </p>
         <div className="game-card__bottom">
           <div className="game-facts">
-            <span>{formatPlayers(game)}</span>
-            <span>{formatDuration(game.durationMinutes)}</span>
+            <span>
+              <small>Gracze</small>
+              {formatPlayers(game)}
+            </span>
+            <span>
+              <small>Czas gry</small>
+              {formatDuration(game.durationMinutes)}
+            </span>
           </div>
-          <Link
-            className="card-arrow"
-            href={`/games/${game.id}`}
-            aria-label={`Zobacz grę ${game.title}`}
+          <button
+            className="card-info"
+            type="button"
+            aria-label={`Informacje o grze: ${game.title}`}
+            aria-haspopup="dialog"
+            title="Informacje o grze"
+            onClick={() => setShowInfo(true)}
           >
-            ↗
-          </Link>
+            <span aria-hidden="true">i</span>
+          </button>
         </div>
       </div>
+      {showInfo && (
+        <GameInfoDialog game={game} onClose={() => setShowInfo(false)} />
+      )}
     </article>
   );
 }

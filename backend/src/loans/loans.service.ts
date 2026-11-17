@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { LoanStatus, Prisma } from '@prisma/client';
 import { serializableTransaction } from '../common/serializable-transaction.js';
+import { LoanEvents } from '../notifications/loan-events.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateLoanDto } from './dto/create-loan.dto.js';
 import { toLoanResponse } from './loan.mapper.js';
@@ -18,8 +19,7 @@ import type {
   LoanListResponseDto,
 } from './dto/loan-list-response.dto.js';
 
-const LOAN_DURATION_DAYS = 14;
-const MAX_ACTIVE_LOANS = 1;
+import { LOAN_DURATION_DAYS, MAX_ACTIVE_LOANS } from './loan-policy.js';
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const loanResponse = {
@@ -34,7 +34,10 @@ const loanResponse = {
 
 @Injectable()
 export class LoansService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly loanEvents: LoanEvents,
+  ) {}
 
   async findMyHistory(
     userId: string,
@@ -146,8 +149,9 @@ export class LoansService {
   }
 
   async borrow(userId: string, dto: CreateLoanDto) {
+    let loan: ReturnType<typeof toLoanResponse>;
     try {
-      return await serializableTransaction(this.prisma, (transaction) =>
+      loan = await serializableTransaction(this.prisma, (transaction) =>
         this.borrowInTransaction(transaction, userId, dto),
       );
     } catch (error) {
@@ -161,6 +165,14 @@ export class LoansService {
       }
       throw error;
     }
+    this.loanEvents.emitBorrowed({
+      loanId: loan.id,
+      userId,
+      gameTitle: loan.gameCopy.game.title,
+      inventoryCode: loan.gameCopy.inventoryCode,
+      dueAt: loan.dueAt,
+    });
+    return loan;
   }
 
   private async borrowInTransaction(

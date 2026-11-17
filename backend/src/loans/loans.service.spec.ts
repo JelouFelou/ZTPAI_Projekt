@@ -4,6 +4,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { LoanEvents } from '../notifications/loan-events.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LoansService } from './loans.service.js';
 
@@ -37,16 +38,20 @@ function setup() {
       .fn()
       .mockImplementation((operation) => operation(transaction)),
   };
+  const loanEvents = new LoanEvents();
+  const emitBorrowed = vi.spyOn(loanEvents, 'emitBorrowed');
   return {
     transaction,
     prisma,
-    service: new LoansService(prisma as unknown as PrismaService),
+    loanEvents,
+    emitBorrowed,
+    service: new LoansService(prisma as unknown as PrismaService, loanEvents),
   };
 }
 
 describe('LoansService borrowing rules', () => {
   it('assigns the authenticated user and a 14-day deadline', async () => {
-    const { service, prisma, transaction } = setup();
+    const { service, prisma, transaction, emitBorrowed } = setup();
     const result = await service.borrow('user', { gameCopyId: 'copy' });
     expect(transaction.loan.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -58,6 +63,13 @@ describe('LoansService borrowing rules', () => {
     ).toBe(14 * 86400000);
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: 'Serializable',
+    });
+    expect(emitBorrowed).toHaveBeenCalledWith({
+      loanId: 'loan',
+      userId: 'user',
+      gameTitle: 'Chess',
+      inventoryCode: 'COPY-1',
+      dueAt: result.dueAt,
     });
   });
 

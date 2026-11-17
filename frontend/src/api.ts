@@ -8,6 +8,10 @@ export interface Game {
   id: string;
   title: string;
   description: string | null;
+  occasion: string | null;
+  difficulty: "EASY" | "MEDIUM" | "HARD" | null;
+  gameplay: string | null;
+  highlights: string[];
   minPlayers: number;
   maxPlayers: number;
   recommendedAge: number;
@@ -15,6 +19,8 @@ export interface Game {
   categoryId: string;
   category: Category;
   availableCopies: number;
+  borrowedCopies: number;
+  expectedReturns: { inventoryCode: string; dueAt: string }[];
 }
 
 export interface PaginatedGames {
@@ -38,7 +44,7 @@ export interface User {
 
 export interface AuthResponse {
   accessToken: string;
-  expiresIn: number;
+  expiresIn: number | null;
   user: User;
 }
 
@@ -62,6 +68,11 @@ export interface Loan {
     inventoryCode: string;
     game: { id: string; title: string };
   };
+}
+
+export interface LoanPolicy {
+  durationDays: number;
+  maxActiveLoans: number;
 }
 
 export interface PaginatedLoans {
@@ -120,8 +131,21 @@ function errorMessage(
   if (status === 409) {
     if (path === "/auth/register")
       return "Konto z tym adresem e-mail już istnieje.";
-    if (path === "/loans")
+    if (path === "/loans") {
+      if (
+        serverMessage ===
+        "An overdue loan must be returned before borrowing another game"
+      )
+        return "Masz grę po terminie. Zwróć ją w „Moich wypożyczeniach”, zanim wypożyczysz kolejną.";
+      if (serverMessage === "A user may have at most 1 active loan")
+        return "Masz już aktywne wypożyczenie. Najpierw zwróć obecną grę w „Moich wypożyczeniach”.";
+      if (
+        serverMessage === "Game copy is not available" ||
+        serverMessage === "Game copy is already borrowed"
+      )
+        return "Ten egzemplarz nie jest już dostępny. Sprawdź ponownie dostępność gry.";
       return "Nie można wypożyczyć gry. Sprawdź swoje aktywne wypożyczenia i dostępność egzemplarza.";
+    }
     if (path.endsWith("/return"))
       return "To wypożyczenie zostało już zwrócone.";
     if (method === "DELETE")

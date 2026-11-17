@@ -1,4 +1,5 @@
 import { PrismaService } from '../prisma/prisma.service.js';
+import { LoanEvents } from '../notifications/loan-events.js';
 import { LoansService } from './loans.service.js';
 import {
   AdminListLoansQueryDto,
@@ -37,7 +38,10 @@ function setup() {
   return {
     prisma,
     record,
-    service: new LoansService(prisma as unknown as PrismaService),
+    service: new LoansService(
+      prisma as unknown as PrismaService,
+      new LoanEvents(),
+    ),
   };
 }
 

@@ -42,12 +42,24 @@ import {
 import { CreateLoanDto } from './dto/create-loan.dto.js';
 import { LoanResponseDto } from './dto/loan-response.dto.js';
 import { LoansService } from './loans.service.js';
+import { LOAN_DURATION_DAYS, MAX_ACTIVE_LOANS } from './loan-policy.js';
+import { LoanPolicyResponseDto } from './dto/loan-policy-response.dto.js';
 
 @Controller('loans')
 @ApiTags('Loans')
 @ApiRequestIdHeader()
 export class LoansController {
   constructor(private readonly loans: LoansService) {}
+
+  @Get('policy')
+  @ApiOperation({ summary: 'Get current borrowing duration and account limit' })
+  @ApiOkResponse({ type: LoanPolicyResponseDto })
+  policy(): LoanPolicyResponseDto {
+    return {
+      durationDays: LOAN_DURATION_DAYS,
+      maxActiveLoans: MAX_ACTIVE_LOANS,
+    };
+  }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)

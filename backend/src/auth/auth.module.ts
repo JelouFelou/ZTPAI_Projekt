@@ -21,7 +21,7 @@ import { RolesGuard } from './roles.guard.js';
 
         return {
           secret,
-          signOptions: { algorithm: 'HS256', expiresIn: '15m' },
+          signOptions: { algorithm: 'HS256' },
           verifyOptions: { algorithms: ['HS256'] },
         };
       },

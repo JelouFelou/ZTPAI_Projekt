@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
+import { demoGameGuides } from './demo-game-guides.mjs';
 
-// Local demonstration data. Existing catalog records are never changed.
+// Existing catalog data is preserved; only missing demo guide fields are filled.
 const examples = [
   {
     category: 'Strategiczne',
@@ -160,6 +161,9 @@ const examples = [
 const prisma = new PrismaClient();
 try {
   for (const [index, example] of examples.entries()) {
+    const { title: _title, ...guide } = demoGameGuides.find(
+      (item) => item.title === example.title,
+    );
     const category = await prisma.category.upsert({
       where: { name: example.category },
       create: { name: example.category },
@@ -167,11 +171,18 @@ try {
     });
     let game = await prisma.game.findFirst({
       where: { title: example.title, categoryId: category.id },
-      select: { id: true },
+      select: {
+        id: true,
+        occasion: true,
+        difficulty: true,
+        gameplay: true,
+        highlights: true,
+      },
     });
     if (!game) {
       game = await prisma.game.create({
         data: {
+          ...guide,
           title: example.title,
           description: example.description,
           minPlayers: example.minPlayers,
@@ -180,7 +191,23 @@ try {
           durationMinutes: example.durationMinutes,
           categoryId: category.id,
         },
-        select: { id: true },
+        select: {
+          id: true,
+          occasion: true,
+          difficulty: true,
+          gameplay: true,
+          highlights: true,
+        },
+      });
+    } else {
+      await prisma.game.update({
+        where: { id: game.id },
+        data: {
+          ...(!game.occasion ? { occasion: guide.occasion } : {}),
+          ...(!game.difficulty ? { difficulty: guide.difficulty } : {}),
+          ...(!game.gameplay ? { gameplay: guide.gameplay } : {}),
+          ...(!game.highlights.length ? { highlights: guide.highlights } : {}),
+        },
       });
     }
     for (let copy = 1; copy <= example.copies; copy++) {

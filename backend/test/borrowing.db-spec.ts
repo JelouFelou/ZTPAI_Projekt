@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { LoansService } from '../src/loans/loans.service.js';
+import { LoanEvents } from '../src/notifications/loan-events.js';
+import { LoanEventsListener } from '../src/notifications/loan-events.listener.js';
+import { NotificationsService } from '../src/notifications/notifications.service.js';
 import { GameCopiesService } from '../src/game-copies/game-copies.service.js';
 import { GamesService } from '../src/games/games.service.js';
 
@@ -14,8 +17,10 @@ if (!url)
 
 const prisma = new PrismaService({ datasourceUrl: url });
 const otherPrisma = new PrismaService({ datasourceUrl: url });
-const loans = new LoansService(prisma);
-const otherLoans = new LoansService(otherPrisma);
+const loanEvents = new LoanEvents();
+const loans = new LoansService(prisma, loanEvents);
+const otherLoans = new LoansService(otherPrisma, new LoanEvents());
+const notifications = new NotificationsService(prisma);
 const copies = new GameCopiesService(prisma);
 const games = new GamesService(prisma);
 let userIds: string[] = [];
@@ -73,12 +78,52 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await prisma.notification.deleteMany({
+    where: { loan: { gameCopyId: { in: copyIds } } },
+  });
   await prisma.loan.deleteMany({ where: { gameCopyId: { in: copyIds } } });
   await prisma.gameCopy.deleteMany({ where: { id: { in: copyIds } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   if (gameId) await prisma.game.deleteMany({ where: { id: gameId } });
   if (categoryId)
     await prisma.category.deleteMany({ where: { id: categoryId } });
+});
+
+it('persists a borrowed-loan notification after the loan is committed', async () => {
+  const listener = new LoanEventsListener(loanEvents, notifications);
+  listener.onModuleInit();
+  try {
+    const loan = await loans.borrow(userIds[0], { gameCopyId: copyIds[0] });
+    await vi.waitFor(async () => {
+      const notification = await prisma.notification.findFirst({
+        where: { loanId: loan.id, type: 'LOAN_BORROWED' },
+      });
+      expect(notification).toMatchObject({
+        loanId: loan.id,
+        userId: userIds[0],
+        type: 'LOAN_BORROWED',
+      });
+    });
+  } finally {
+    listener.onModuleDestroy();
+  }
+});
+
+it('persists only one reminder per overdue active loan', async () => {
+  const loan = await loans.borrow(userIds[0], { gameCopyId: copyIds[0] });
+  const now = new Date();
+  await prisma.loan.update({
+    where: { id: loan.id },
+    data: { dueAt: new Date(now.getTime() - 60_000) },
+  });
+
+  await expect(notifications.recordOverdueReminders(now)).resolves.toBe(1);
+  await expect(notifications.recordOverdueReminders(now)).resolves.toBe(0);
+  expect(
+    await prisma.notification.findMany({
+      where: { loanId: loan.id, type: 'LOAN_OVERDUE_REMINDER' },
+    }),
+  ).toHaveLength(1);
 });
 
 it('persists borrowing and exposes actual availability', async () => {

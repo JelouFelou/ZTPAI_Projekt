@@ -59,7 +59,13 @@ function App() {
           {user ? (
             <div className="header-account">
               <span>Cześć, {user.firstName}</span>
-              <button type="button" onClick={logout}>
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  window.location.replace("/");
+                }}
+              >
                 Wyloguj
               </button>
             </div>
@@ -103,6 +109,12 @@ function App() {
           </span>
           <span>Gry planszowe, które łączą przy stole.</span>
           <Link href="/games">Katalog ↗</Link>
+        </div>
+        <div className="container footer-credit">
+          <span>Adrian Bober · nr albumu 152685</span>
+          <a href="mailto:adrian.bober@student.pk.edu.pl">
+            adrian.bober@student.pk.edu.pl
+          </a>
         </div>
       </footer>
     </div>

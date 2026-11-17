@@ -76,6 +76,10 @@ export function GameForm({
   save: (body: {
     title: string;
     description: string | null;
+    occasion: string | null;
+    difficulty: Game["difficulty"];
+    gameplay: string | null;
+    highlights: string[];
     minPlayers: number;
     maxPlayers: number;
     recommendedAge: number;
@@ -89,6 +93,18 @@ export function GameForm({
     const values = new FormData(event.currentTarget);
     const minPlayers = Number(values.get("minPlayers"));
     const maxPlayers = Number(values.get("maxPlayers"));
+    const highlights = [
+      ...new Set(
+        String(values.get("highlights"))
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (highlights.length > 6 || highlights.some((line) => line.length > 100)) {
+      setValidation("Dodaj najwyżej 6 cech, każda do 100 znaków.");
+      return;
+    }
     if (minPlayers > maxPlayers) {
       setValidation(
         "Minimalna liczba graczy nie może być większa od maksymalnej.",
@@ -99,6 +115,11 @@ export function GameForm({
     void save({
       title: String(values.get("title")).trim(),
       description: String(values.get("description")).trim() || null,
+      occasion: String(values.get("occasion")).trim() || null,
+      difficulty: (String(values.get("difficulty")) ||
+        null) as Game["difficulty"],
+      gameplay: String(values.get("gameplay")).trim() || null,
+      highlights,
       minPlayers,
       maxPlayers,
       recommendedAge: Number(values.get("recommendedAge")),
@@ -127,6 +148,52 @@ export function GameForm({
           defaultValue={item?.description ?? ""}
         />
       </label>
+      <fieldset className="admin-game-guide">
+        <legend>Pomoc w wyborze gry</legend>
+        <p className="admin-hint">
+          Opcjonalne informacje widoczne w okienku „i” i na stronie gry.
+        </p>
+        <label>
+          Na jaką okazję?
+          <input
+            name="occasion"
+            maxLength={200}
+            defaultValue={item?.occasion ?? ""}
+            placeholder="Np. spokojny wieczór we dwoje"
+          />
+        </label>
+        <label>
+          Poziom trudności
+          <select name="difficulty" defaultValue={item?.difficulty ?? ""}>
+            <option value="">Nie określono</option>
+            <option value="EASY">Łatwa</option>
+            <option value="MEDIUM">Średnia</option>
+            <option value="HARD">Wymagająca</option>
+          </select>
+        </label>
+        <label>
+          Na czym polega gra?
+          <textarea
+            name="gameplay"
+            rows={4}
+            maxLength={2000}
+            defaultValue={item?.gameplay ?? ""}
+            placeholder="W 2–3 zdaniach opisz cel i przebieg rozgrywki."
+          />
+        </label>
+        <label>
+          Warto wiedzieć
+          <textarea
+            name="highlights"
+            rows={3}
+            defaultValue={item?.highlights?.join("\n") ?? ""}
+            placeholder={"Gracie wspólnie\nMożna grać solo"}
+          />
+          <small>
+            Jedna cecha w wierszu. Maksymalnie 6 cech po 100 znaków.
+          </small>
+        </label>
+      </fieldset>
       <label>
         Kategoria
         <select

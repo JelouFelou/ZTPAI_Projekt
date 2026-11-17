@@ -1,4 +1,4 @@
-﻿# BoardRent frontend
+# BoardRent frontend
 
 Katalog i panel wypożyczeń gier planszowych zbudowany w React, TypeScript i Vite.
 
@@ -25,9 +25,13 @@ Jeśli katalog jest pusty, z katalogu `backend` uruchom `npm.cmd run db:seed-dem
 - `/loans` — własne wypożyczenia, terminy zwrotu i zwracanie gier.
 - `/admin` — panel administratora: dodawanie, edycja i usuwanie gier, kategorii oraz egzemplarzy; zakładka „Wypożyczenia” pokazuje historię wszystkich użytkowników z filtrami i paginacją po stronie API.
 
-Filtry, rozmiar strony i numer strony są zapisane w adresie. Można skopiować link do wyników lub wrócić do nich przyciskiem Wstecz w przeglądarce. Po zalogowaniu można wypożyczyć dostępny egzemplarz ze strony szczegółów gry. Sesja jest zapisana tylko w bieżącej karcie przeglądarki i wygasa po 15 minutach; po wygaśnięciu trzeba zalogować się ponownie. Panel administratora wymaga konta z rolą `ADMIN`. Utwórz je zgodnie z [instrukcją backendu](../backend/README.md#administrator), a następnie zaloguj się na stronie. Formularze wyświetlają błędy walidacji, odmowy dostępu i konfliktów zapisu; przed usunięciem wpisu proszą o potwierdzenie.
+Wypożyczenie ma etap podsumowania: użytkownik widzi konkretny egzemplarz, okres wypożyczenia i swoje dane, a następnie zaznacza potwierdzenie i zapisuje wypożyczenie. Dopiero wtedy powstaje aktywny rekord. „Moje wypożyczenia” pokazują aktualną grę, dokładny termin w czasie polskim, czas pozostały do zwrotu oraz potwierdzenie do pobrania. Historia zwróconych gier jest osobna. Zwrot wymaga potwierdzenia oddania kompletnego egzemplarza; anulowanie okienka nie zmienia danych. Użytkownik z aktywnym wypożyczeniem od razu widzi tę informację przy kolejnej grze. Czas wypożyczenia i limit są pobierane z `GET /api/loans/policy`; ostateczną dostępność sprawdza backend podczas zapisu.
+
+Filtry, rozmiar strony i numer strony są zapisane w adresie. Można skopiować link do wyników lub wrócić do nich przyciskiem Wstecz w przeglądarce. Po zalogowaniu można wypożyczyć dostępny egzemplarz ze strony szczegółów gry. Sesja jest zapisana w sessionStorage bieżącej karty przeglądarki i nie wygasa po określonym czasie. Wylogowanie usuwa sesję, a zamknięcie karty kończy jej przechowywanie (przeglądarka może ją przywrócić przy odtwarzaniu kart). Panel administratora wymaga konta z rolą `ADMIN`. Utwórz je zgodnie z [instrukcją backendu](../backend/README.md#administrator), a następnie zaloguj się na stronie. Formularze wyświetlają błędy walidacji, odmowy dostępu i konfliktów zapisu; przed usunięciem wpisu proszą o potwierdzenie.
 
 ## Kontrole
+
+Potwierdzenie odebrania konkretnego, kompletnego egzemplarza uruchamia wypożyczenie, a potwierdzenie fizycznego oddania je zamyka. Daty tych operacji są widoczne w wypożyczeniu i pobieranym potwierdzeniu. Na stronie gry i w okienku „i” widać liczbę dostępnych i wypożyczonych kopii oraz planowane zwroty. Terminy po czasie są oznaczone jako zaległe. Układ stron korzysta z szerokości okna; katalog automatycznie dobiera liczbę kolumn, a aktywne wypożyczenie i historia na szerokim ekranie stoją obok siebie.
 
 ```powershell
 npm.cmd run build

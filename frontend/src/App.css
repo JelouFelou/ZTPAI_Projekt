@@ -10,7 +10,7 @@
   flex: 1;
 }
 .container {
-  width: min(1200px, calc(100% - 48px));
+  width: calc(100% - clamp(32px, 5vw, 128px));
   margin-inline: auto;
 }
 .site-header {
@@ -463,10 +463,13 @@
 }
 .game-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 25px;
 }
 .game-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   overflow: hidden;
   background: #fff;
@@ -482,6 +485,7 @@
   box-shadow: 0 18px 32px #31223c16;
 }
 .game-art {
+  flex-shrink: 0;
   position: relative;
   height: 215px;
   overflow: hidden;
@@ -555,6 +559,9 @@
   opacity: 0.65;
 }
 .game-card__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   padding: 21px 22px 19px;
 }
 .card-topline {
@@ -606,6 +613,19 @@
 .game-card h3 a:hover {
   color: #753fb5;
 }
+.game-card__link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+.game-card:has(.game-card__link:focus-visible) {
+  outline: 3px solid #9a66e4;
+  outline-offset: 4px;
+}
+.game-card__link:focus-visible {
+  outline: none;
+}
 .game-card__description {
   color: #77717e;
   font-size: 13px;
@@ -618,6 +638,7 @@
   margin: 0 0 20px;
 }
 .game-card__bottom {
+  margin-top: auto;
   border-top: 1px solid #f0ebef;
   padding-top: 14px;
   display: flex;
@@ -627,21 +648,28 @@
 }
 .game-facts {
   display: flex;
-  gap: 11px;
+  gap: 24px;
   flex-wrap: wrap;
   color: #736a7f;
   font-size: 12px;
   font-weight: 600;
 }
-.game-facts span:before {
-  content: "✦";
-  font-size: 9px;
-  margin-right: 5px;
-  color: #ae8acb;
+.game-facts > span {
+  display: grid;
+  gap: 4px;
 }
-.card-arrow {
-  width: 31px;
-  height: 31px;
+.game-facts small {
+  font-size: 10px;
+  font-weight: 500;
+  color: #77717e;
+}
+.card-info {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #e7dcef;
   display: grid;
   place-items: center;
   background: #f2e9fb;
@@ -649,9 +677,181 @@
   border-radius: 9px;
   font-weight: 700;
 }
-.card-arrow:hover {
+.card-info span {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-family: Georgia, serif;
+  font-size: 14px;
+  line-height: 1;
+}
+.card-info:hover {
   background: #6c37b0;
   color: #fff;
+}
+.game-info-dialog {
+  width: min(460px, calc(100% - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  padding: clamp(24px, 5vw, 32px);
+  border: 1px solid #e9e1ec;
+  border-radius: 24px;
+  color: #30203f;
+  background: #fff;
+  box-shadow: 0 24px 90px #21182f30;
+}
+.game-info-dialog::backdrop {
+  background: #21182f66;
+  backdrop-filter: blur(4px);
+}
+.game-info-dialog__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.game-info-dialog__header .eyebrow {
+  margin: 0;
+  line-height: 1.6;
+}
+.game-info-dialog__close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: #f5f1f8;
+  color: #6d587e;
+  font-size: 27px;
+}
+.game-info-dialog__close:hover {
+  background: #eae0f2;
+}
+.game-info-dialog h2 {
+  margin: 16px 0 12px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: clamp(25px, 6vw, 30px);
+  line-height: 1.25;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+.game-info-dialog__description {
+  margin: 0;
+  color: #706778;
+  font-size: 14px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.game-info-dialog__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0 20px;
+  padding-block: 20px;
+  border-block: 1px solid #eee8f2;
+}
+.game-info-dialog__facts dt {
+  margin-bottom: 7px;
+  color: #77717e;
+  font-size: 12px;
+}
+.game-info-dialog__facts dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+.game-info-dialog__availability {
+  margin: 0;
+  font-size: 12px;
+  white-space: normal;
+}
+.game-guide {
+  display: grid;
+  gap: 22px;
+  margin-top: 22px;
+  overflow-wrap: anywhere;
+}
+.game-guide__summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr);
+  gap: 18px;
+  margin: 0;
+  padding: 16px;
+  background: #f8f5fc;
+  border-radius: 14px;
+}
+.game-guide__summary dt {
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: #756880;
+}
+.game-guide__summary dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+.game-guide h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #44324f;
+}
+.game-guide p {
+  margin: 0;
+  font-size: 14px;
+  color: #706778;
+  line-height: 1.75;
+  white-space: pre-line;
+}
+.game-guide ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.game-guide li {
+  max-width: 100%;
+  border: 1px solid #e9e1ee;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #6c577b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.game-guide + .game-info-dialog__description {
+  margin-top: 20px;
+}
+.details-description > .game-guide {
+  margin: 0 0 36px;
+}
+.admin-game-guide {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 18px;
+  border: 1px solid #e6ddec;
+  border-radius: 14px;
+}
+.admin-game-guide legend {
+  padding: 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.admin-game-guide .admin-hint {
+  margin: 0;
+}
+.admin-game-guide small {
+  color: #756d7e;
+  font-weight: 400;
+  line-height: 1.5;
 }
 .skeleton-card {
   pointer-events: none;
@@ -782,6 +982,22 @@
 .site-footer {
   background: #21182f;
   color: #cfc0d9;
+}
+.footer-credit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  padding-block: 18px 24px;
+  border-top: 1px solid #ffffff1a;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.footer-credit a {
+  overflow-wrap: anywhere;
+}
+.footer-credit a:hover {
+  color: #fff;
+  text-decoration: underline;
 }
 .footer-inner {
   min-height: 110px;
@@ -979,9 +1195,6 @@
     width: 85px;
     height: 85px;
   }
-  .game-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .details-grid {
     gap: 35px;
   }
@@ -993,9 +1206,6 @@
   }
 }
 @media (max-width: 650px) {
-  .container {
-    width: min(100% - 32px, 1200px);
-  }
   .header-inner {
     height: 72px;
     gap: 15px;
@@ -1081,7 +1291,6 @@
     justify-content: end;
   }
   .game-grid {
-    grid-template-columns: 1fr;
     gap: 18px;
   }
   .game-art {
@@ -1818,5 +2027,413 @@
   .header-nav a {
     max-width: 85px;
     line-height: 1.2;
+  }
+}
+
+/* Borrowing and returns */
+.action-dialog {
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  margin: auto;
+  padding: clamp(24px, 5vw, 32px);
+  border: 1px solid #e9e1ec;
+  border-radius: 24px;
+  color: #30203f;
+  background: #fff;
+  box-shadow: 0 24px 90px #21182f30;
+}
+.action-dialog::backdrop {
+  background: #21182f66;
+  backdrop-filter: blur(4px);
+}
+.action-dialog__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.action-dialog__header h2 {
+  margin: 5px 0 0;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: clamp(23px, 5vw, 28px);
+  letter-spacing: -0.04em;
+  line-height: 1.3;
+}
+.action-dialog__lead {
+  margin: 22px 0 16px;
+  font-size: 19px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.loan-checkout-facts {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  margin: 0;
+  border-radius: 14px;
+  background: #f8f5fc;
+}
+.loan-checkout-facts > div {
+  display: grid;
+  gap: 5px;
+}
+.loan-checkout-facts dt {
+  font-size: 12px;
+  color: #756880;
+}
+.loan-checkout-facts dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.loan-explanation {
+  max-width: 650px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: #706778;
+  margin: 20px 0;
+}
+.loan-agreement {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e6dcec;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.7;
+  cursor: pointer;
+}
+.loan-agreement input {
+  flex: none;
+  width: 19px;
+  height: 19px;
+  margin: 2px 0 0;
+  accent-color: #7039ac;
+}
+.action-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+.action-dialog .form-error {
+  margin-top: 16px;
+}
+.borrow-summary {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  margin-top: 28px;
+  padding: 20px;
+  border: 1px solid #e5d9ee;
+  border-radius: 15px;
+  background: #f9f5fd;
+}
+.borrow-summary p {
+  margin: 0;
+  color: #706778;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.borrow-summary small {
+  color: #756880;
+  line-height: 1.6;
+}
+.active-loan {
+  margin-top: 24px;
+  border: 1px solid #dac9eb;
+  border-radius: 24px;
+  padding: clamp(24px, 4vw, 36px);
+  background: #fff;
+  box-shadow: 0 10px 35px #3a245309;
+}
+.active-loan--overdue {
+  border-color: #e4ba93;
+}
+.active-loan__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.active-loan__countdown {
+  font-size: 13px;
+  font-weight: 700;
+  color: #6b3ba4;
+}
+.active-loan--overdue .active-loan__countdown {
+  color: #9c5623;
+}
+.active-loan h2 {
+  margin: 24px 0 8px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: clamp(27px, 5vw, 38px);
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+.active-loan__copy {
+  color: #756880;
+  font-size: 14px;
+}
+.active-loan__copy strong {
+  color: #493753;
+}
+.active-loan__dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 24px 0 0;
+  padding: 22px 0;
+  border-block: 1px solid #eee8f2;
+}
+.active-loan__dates dt {
+  color: #756880;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.active-loan__dates dd {
+  margin: 0;
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 1.5;
+}
+.active-loan__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.loan-receipt-link {
+  border: 0;
+  padding: 8px 0;
+  background: transparent;
+  color: #7542a5;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+.loan-receipt-link:hover {
+  text-decoration: underline;
+}
+.loan-reference {
+  margin-top: 24px;
+  color: #817487;
+  font-size: 12px;
+}
+.loan-reference summary {
+  cursor: pointer;
+}
+.loan-reference code {
+  display: block;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.loan-history {
+  margin-top: 44px;
+}
+.loan-history > h2 {
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+.loan-history__empty {
+  color: #756880;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.loan-card--history {
+  box-shadow: none;
+}
+.loan-card--history h3 {
+  margin: 10px 0 6px;
+  font-size: 19px;
+}
+.loan-status--returned {
+  color: #766a80;
+  background: #f0ecf4;
+}
+.loans-no-active {
+  margin-top: 24px;
+}
+@media (max-width: 650px) {
+  .active-loan__dates {
+    grid-template-columns: 1fr;
+  }
+  .active-loan__actions,
+  .action-dialog__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .action-dialog__actions .button {
+    width: 100%;
+  }
+  .loan-dates span {
+    flex-wrap: wrap;
+  }
+}
+
+/* Fluid pages and copy availability */
+.game-availability {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #eee8f2;
+}
+.game-availability__counts {
+  display: flex;
+  gap: 32px;
+  margin: 0 0 18px;
+}
+.game-availability__counts > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 5px;
+}
+.game-availability__counts dt {
+  font-size: 12px;
+  color: #756880;
+}
+.game-availability__counts dd {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.game-availability__counts > div:first-child dd {
+  color: #389072;
+}
+.game-availability h3 {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+.game-availability__returns {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.game-availability__returns li {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f1ecf4;
+  font-size: 12px;
+}
+.game-availability__returns li > span {
+  color: #756880;
+  overflow-wrap: anywhere;
+}
+.game-availability__returns li > div {
+  display: grid;
+  gap: 5px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.game-availability__returns time {
+  font-weight: 600;
+}
+.game-availability__overdue {
+  color: #a26436;
+  font-size: 10px;
+}
+.game-availability > p {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #817487;
+}
+.game-info-dialog .game-availability {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.loans-workspace {
+  display: grid;
+  gap: clamp(24px, 3vw, 48px);
+  align-items: start;
+}
+.loans-workspace > .active-loan,
+.loans-workspace > .loans-no-active,
+.loans-workspace > .loan-history {
+  margin-top: 0;
+  min-width: 0;
+}
+.loans-workspace .loan-history {
+  background: #fff;
+  border: 1px solid #eae2ee;
+  border-radius: 24px;
+  padding: clamp(24px, 3vw, 36px);
+}
+.loans-workspace .loan-history > h2 {
+  margin-top: 0;
+}
+.loans-workspace .loan-card--history {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  background: #fdfbff;
+}
+.details-grid {
+  align-items: start;
+  gap: clamp(28px, 4vw, 90px);
+}
+.details-info {
+  min-width: 0;
+}
+.details-info > .details-lead {
+  max-width: 75ch;
+}
+.game-art--large {
+  height: clamp(360px, 35vw, 640px);
+}
+.details-description {
+  max-width: none;
+}
+@media (min-width: 1100px) {
+  .loans-workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .admin-grid {
+    grid-template-columns: minmax(320px, 0.65fr) minmax(0, 1.35fr);
+  }
+  .details-description {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: clamp(32px, 5vw, 100px);
+  }
+  .details-description > .game-guide {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    margin: 0;
+  }
+  .details-description > .eyebrow,
+  .details-description > h2,
+  .details-description > p {
+    grid-column: 1;
+  }
+  .hero-visual {
+    max-width: 650px;
+    width: 100%;
+    justify-self: center;
+  }
+}
+@media (min-width: 1800px) {
+  .loans-workspace .loan-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .game-art--large {
+    height: 320px;
+  }
+  .game-availability__returns li {
+    flex-wrap: wrap;
+  }
+  .game-availability__returns li > div {
+    text-align: left;
   }
 }

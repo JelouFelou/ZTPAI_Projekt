@@ -14,6 +14,18 @@ import type { GameListResponseDto } from './dto/game-response.dto.js';
 
 const gameResponse = {
   category: true,
+  copies: {
+    where: { loans: { some: { status: 'ACTIVE' } } },
+    select: {
+      inventoryCode: true,
+      loans: {
+        where: { status: 'ACTIVE' },
+        select: { dueAt: true },
+        orderBy: { dueAt: 'asc' },
+        take: 1,
+      },
+    },
+  },
   _count: {
     select: {
       copies: {

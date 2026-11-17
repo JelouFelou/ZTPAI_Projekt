@@ -18,21 +18,33 @@ enum CopyStatus {
   RETIRED
 }
 
+enum GameDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
 enum LoanStatus {
   ACTIVE
   RETURNED
 }
 
+enum NotificationType {
+  LOAN_BORROWED
+  LOAN_OVERDUE_REMINDER
+}
+
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique @db.VarChar(320)
-  passwordHash String   @map("password_hash")
-  firstName    String   @map("first_name") @db.VarChar(100)
-  lastName     String   @map("last_name") @db.VarChar(100)
-  role         UserRole @default(USER)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-  loans        Loan[]
+  id            String         @id @default(uuid()) @db.Uuid
+  email         String         @unique @db.VarChar(320)
+  passwordHash  String         @map("password_hash")
+  firstName     String         @map("first_name") @db.VarChar(100)
+  lastName      String         @map("last_name") @db.VarChar(100)
+  role          UserRole       @default(USER)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  loans         Loan[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -49,18 +61,22 @@ model Category {
 }
 
 model Game {
-  id              String     @id @default(uuid()) @db.Uuid
-  title           String     @db.VarChar(200)
+  id              String          @id @default(uuid()) @db.Uuid
+  title           String          @db.VarChar(200)
   description     String?
-  minPlayers      Int        @map("min_players")
-  maxPlayers      Int        @map("max_players")
-  recommendedAge  Int        @map("recommended_age")
-  durationMinutes Int        @map("duration_minutes")
-  categoryId      String     @map("category_id") @db.Uuid
-  category        Category   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  occasion        String?         @db.VarChar(200)
+  difficulty      GameDifficulty?
+  gameplay        String?         @db.VarChar(2000)
+  highlights      String[]        @default([])
+  minPlayers      Int             @map("min_players")
+  maxPlayers      Int             @map("max_players")
+  recommendedAge  Int             @map("recommended_age")
+  durationMinutes Int             @map("duration_minutes")
+  categoryId      String          @map("category_id") @db.Uuid
+  category        Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   copies          GameCopy[]
-  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([categoryId])
   @@index([title])
@@ -83,19 +99,35 @@ model GameCopy {
 
 model Loan {
   // Partial unique indexes in SQL migrations enforce one ACTIVE loan per copy and per user.
-  id         String     @id @default(uuid()) @db.Uuid
-  userId     String     @map("user_id") @db.Uuid
-  gameCopyId String     @map("game_copy_id") @db.Uuid
-  status     LoanStatus @default(ACTIVE)
-  borrowedAt DateTime   @default(now()) @map("borrowed_at") @db.Timestamptz(3)
-  dueAt      DateTime   @map("due_at") @db.Timestamptz(3)
-  returnedAt DateTime?  @map("returned_at") @db.Timestamptz(3)
-  user       User       @relation(fields: [userId], references: [id], onDelete: Restrict)
-  gameCopy   GameCopy   @relation(fields: [gameCopyId], references: [id], onDelete: Restrict)
-  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id            String         @id @default(uuid()) @db.Uuid
+  userId        String         @map("user_id") @db.Uuid
+  gameCopyId    String         @map("game_copy_id") @db.Uuid
+  status        LoanStatus     @default(ACTIVE)
+  borrowedAt    DateTime       @default(now()) @map("borrowed_at") @db.Timestamptz(3)
+  dueAt         DateTime       @map("due_at") @db.Timestamptz(3)
+  returnedAt    DateTime?      @map("returned_at") @db.Timestamptz(3)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  gameCopy      GameCopy       @relation(fields: [gameCopyId], references: [id], onDelete: Restrict)
+  notifications Notification[]
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@index([userId, status])
   @@index([gameCopyId, status])
   @@map("loans")
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  loanId    String           @map("loan_id") @db.Uuid
+  type      NotificationType
+  message   String           @db.VarChar(500)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  loan      Loan             @relation(fields: [loanId], references: [id], onDelete: Restrict)
+
+  @@unique([loanId, type])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }

@@ -12,13 +12,13 @@ export class RegisterDto {
   email!: string;
 
   @ApiProperty({
-    minLength: 12,
+    minLength: 8,
     maxLength: 128,
     writeOnly: true,
     example: 'correct-horse-battery-staple',
   })
   @IsString()
-  @MinLength(12)
+  @MinLength(8)
   @MaxLength(128)
   password!: string;
 

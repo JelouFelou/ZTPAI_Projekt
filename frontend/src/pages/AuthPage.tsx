@@ -102,7 +102,7 @@ export default function AuthPage({
               <input
                 required
                 type="password"
-                minLength={mode === "register" ? 12 : undefined}
+                minLength={mode === "register" ? 8 : undefined}
                 maxLength={128}
                 autoComplete={
                   mode === "register" ? "new-password" : "current-password"
@@ -112,7 +112,7 @@ export default function AuthPage({
               />
             </label>
             {mode === "register" && (
-              <small>Hasło musi mieć co najmniej 12 znaków.</small>
+              <small>Hasło musi mieć co najmniej 8 znaków.</small>
             )}
             {error && (
               <p className="form-error" role="alert">

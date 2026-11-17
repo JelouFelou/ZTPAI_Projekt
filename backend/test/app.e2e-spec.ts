@@ -36,9 +36,14 @@ const category = {
 
 const game = {
   _count: { copies: 1 },
+  copies: [],
   id: gameId,
   title: 'Szachy',
   description: null,
+  occasion: null,
+  difficulty: null,
+  gameplay: null,
+  highlights: [],
   minPlayers: 2,
   maxPlayers: 2,
   recommendedAge: 6,
@@ -79,10 +84,12 @@ const categoryResponse = {
   updatedAt: category.updatedAt.toISOString(),
 };
 
-const { _count: _gameCount, ...gameFields } = game;
+const { _count: _gameCount, copies: _gameCopies, ...gameFields } = game;
 const gameResponse = {
   ...gameFields,
   availableCopies: 1,
+  borrowedCopies: 0,
+  expectedReturns: [],
   category: categoryResponse,
   createdAt: game.createdAt.toISOString(),
   updatedAt: game.updatedAt.toISOString(),
@@ -114,6 +121,7 @@ function createPrismaMock() {
     game: createDelegate(),
     gameCopy: createDelegate(),
     loan: createDelegate(),
+    notification: createDelegate(),
     user: createDelegate(),
   };
   return {
@@ -161,6 +169,7 @@ describe('BoardRent API (e2e)', () => {
     app = moduleFixture.createNestApplication();
     configureApi(app);
     await app.init();
+    vi.clearAllMocks();
   });
 
   afterEach(async () => {
@@ -180,6 +189,13 @@ describe('BoardRent API (e2e)', () => {
       .expect(200)
       .expect('X-Request-Id', 'health-check-1')
       .expect('Hello World!');
+  });
+
+  it('publishes the same borrowing policy used to create a loan', async () => {
+    await request(app.getHttpServer())
+      .get('/api/loans/policy')
+      .expect(200)
+      .expect({ durationDays: 14, maxActiveLoans: 1 });
   });
 
   it('registers a normalized member account with an Argon2id password hash', async () => {
@@ -273,7 +289,7 @@ describe('BoardRent API (e2e)', () => {
 
     expect(loginResponse.body).toMatchObject({
       tokenType: 'Bearer',
-      expiresIn: 900,
+      expiresIn: null,
       user: {
         id: userId,
         email: user.email,
@@ -282,6 +298,14 @@ describe('BoardRent API (e2e)', () => {
     });
     expect(loginResponse.body.accessToken).toEqual(expect.any(String));
     expect(loginResponse.body.user).not.toHaveProperty('passwordHash');
+    const claims = app.get(JwtService).decode(loginResponse.body.accessToken);
+    expect(claims).not.toHaveProperty('exp');
+    const verifyInFuture = app
+      .get(JwtService)
+      .verify(loginResponse.body.accessToken, {
+        clockTimestamp: Math.floor(Date.now() / 1000) + 365 * 86400,
+      });
+    expect(verifyInFuture.sub).toBe(userId);
 
     await request(app.getHttpServer())
       .get('/api/auth/verify')
@@ -363,6 +387,15 @@ describe('BoardRent API (e2e)', () => {
     expect(
       createArgs.data.dueAt.getTime() - createArgs.data.borrowedAt.getTime(),
     ).toBe(14 * 24 * 60 * 60 * 1000);
+    await vi.waitFor(() =>
+      expect(prisma.notification.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId,
+          loanId: loan.id,
+          type: 'LOAN_BORROWED',
+        }),
+      }),
+    );
   });
 
   it('returns an owned loan with status 200 and an ISO return date', async () => {
@@ -943,6 +976,137 @@ describe('BoardRent API (e2e)', () => {
     for (const status of ['200', '400', '401', '404', '409', '503']) {
       expect(returnOperation.responses[status]).toBeDefined();
     }
+  });
+
+  it('saves, returns and clears optional game guide fields', async () => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    const token = await createAccessToken(app, 'ADMIN');
+    prisma.category.findUnique.mockResolvedValue(category);
+    const guide = {
+      occasion: 'Wieczór we dwoje',
+      difficulty: 'MEDIUM',
+      gameplay: 'Wybieraj ruchy i chroń swojego króla.',
+      highlights: ['Dla dwóch graczy', 'Planowanie'],
+    };
+    prisma.game.create.mockResolvedValue({ ...game, ...guide });
+    const created = await request(app.getHttpServer())
+      .post('/api/games')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: game.title,
+        categoryId,
+        minPlayers: 2,
+        maxPlayers: 2,
+        recommendedAge: 6,
+        durationMinutes: 60,
+        ...guide,
+        occasion: `  ${guide.occasion}  `,
+        highlights: ['  Dla dwóch graczy  ', 'Planowanie'],
+      })
+      .expect(201);
+    expect(created.body).toMatchObject(guide);
+    expect(prisma.game.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining(guide),
+      }),
+    );
+    prisma.game.findUnique.mockResolvedValue({ ...game, ...guide });
+    await request(app.getHttpServer())
+      .get(`/api/games/${gameId}`)
+      .expect(200)
+      .expect({ ...gameResponse, ...guide });
+
+    const cleared = {
+      occasion: null,
+      difficulty: null,
+      gameplay: null,
+      highlights: [],
+    };
+    prisma.game.update.mockResolvedValue({ ...game, ...cleared });
+    await request(app.getHttpServer())
+      .patch(`/api/games/${gameId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(cleared)
+      .expect(200)
+      .expect({ ...gameResponse, ...cleared });
+    expect(prisma.game.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: cleared }),
+    );
+  });
+
+  it.each([
+    { difficulty: 'UNKNOWN' },
+    { occasion: 'x'.repeat(201) },
+    { gameplay: 'x'.repeat(2001) },
+    { highlights: [''] },
+    { highlights: ['   '] },
+    { highlights: ['x'.repeat(101)] },
+    { highlights: Array.from({ length: 7 }, (_, index) => `tag-${index}`) },
+    { highlights: ['same', 'same'] },
+    { highlights: [123] },
+    { highlights: null },
+  ])('rejects invalid game guide data: %j', async (invalid) => {
+    prisma.user.findUnique.mockResolvedValue({ ...user, role: 'ADMIN' });
+    const token = await createAccessToken(app, 'ADMIN');
+    for (const method of ['post', 'patch'] as const) {
+      await request(app.getHttpServer())
+        [method](method === 'post' ? '/api/games' : `/api/games/${gameId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          title: 'Szachy',
+          categoryId,
+          minPlayers: 2,
+          maxPlayers: 2,
+          recommendedAge: 6,
+          durationMinutes: 60,
+          ...invalid,
+        })
+        .expect(400);
+    }
+    expect(prisma.game.create).not.toHaveBeenCalled();
+    expect(prisma.game.update).not.toHaveBeenCalled();
+  });
+
+  it('publishes borrowed copy counts and sorted return dates without borrower data', async () => {
+    const copies = [
+      {
+        inventoryCode: 'DEMO-2',
+        loans: [{ dueAt: new Date('2026-12-02T12:00:00Z') }],
+      },
+      {
+        inventoryCode: 'DEMO-1',
+        loans: [{ dueAt: new Date('2026-12-01T12:00:00Z') }],
+      },
+    ];
+    prisma.game.findUnique.mockResolvedValue({ ...game, copies });
+    const response = await request(app.getHttpServer())
+      .get(`/api/games/${gameId}`)
+      .expect(200);
+    expect(response.body.borrowedCopies).toBe(2);
+    expect(response.body.expectedReturns).toEqual([
+      { inventoryCode: 'DEMO-1', dueAt: '2026-12-01T12:00:00.000Z' },
+      { inventoryCode: 'DEMO-2', dueAt: '2026-12-02T12:00:00.000Z' },
+    ]);
+    expect(response.body).not.toHaveProperty('copies');
+    expect(response.body).not.toHaveProperty('_count');
+    expect(prisma.game.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          copies: {
+            where: { loans: { some: { status: 'ACTIVE' } } },
+            select: {
+              inventoryCode: true,
+              loans: {
+                where: { status: 'ACTIVE' },
+                select: { dueAt: true },
+                orderBy: { dueAt: 'asc' },
+                take: 1,
+              },
+            },
+          },
+        }),
+      }),
+    );
   });
 
   it('supports game CRUD with its category relation', async () => {

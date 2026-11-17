@@ -8,8 +8,13 @@ export class AuthResponseDto {
   @ApiProperty({ enum: ['Bearer'] })
   tokenType!: 'Bearer';
 
-  @ApiProperty({ example: 900 })
-  expiresIn!: number;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: null,
+    description: 'No time limit for new sessions',
+  })
+  expiresIn!: number | null;
 
   @ApiProperty({ type: AuthUserResponseDto })
   user!: AuthUserResponseDto;

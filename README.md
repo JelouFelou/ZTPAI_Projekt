@@ -37,7 +37,7 @@ API domyślnie działa pod `http://localhost:3000`. `.env.example` zawiera ustaw
 
 Endpointy katalogu obsługują listowanie, pobieranie szczegółu, tworzenie, aktualizowanie i usuwanie. Swagger UI jest dostępne pod `/api/docs`.
 
-Hasła są haszowane Argon2id. Token JWT jest podpisany HS256 i wygasa po 15 minutach. Odczyt katalogu jest publiczny, a jego modyfikacja wymaga roli `ADMIN`; rejestracja tworzy konto `USER`. Szczegóły endpointów, odpowiedzi i konfiguracji opisuje [backend/README.md](./backend/README.md).
+Hasła są haszowane Argon2id. Token JWT jest podpisany HS256 i dla nowych sesji nie ma limitu czasu ważności. Odczyt katalogu jest publiczny, a jego modyfikacja wymaga roli `ADMIN`; rejestracja tworzy konto `USER`. Szczegóły endpointów, odpowiedzi i konfiguracji opisuje [backend/README.md](./backend/README.md).
 
 Zalogowany użytkownik może wypożyczyć dostępny egzemplarz przez `POST /api/loans`. Wypożyczenie trwa 14 dni, a limit wynosi jedno aktywne wypożyczenie na użytkownika.
 
@@ -47,13 +47,31 @@ Historia obejmuje aktywne i zwrócone wypożyczenia, od najnowszych. Obsługuje 
 
 ## Frontend
 
-Na Windows możesz uruchomić oba serwery jedną komendą z katalogu głównego (po przygotowaniu bazy, migracji, `backend/.env` i zależności):
+### Uruchomienie całej aplikacji w Docker Compose
+
+Skonfiguruj `backend/.env`, ustawiając `AUTH_JWT_SECRET` na własny sekret, a następnie z katalogu głównego uruchom:
+
+```powershell
+docker compose --env-file backend/.env up --build
+```
+
+Compose uruchamia PostgreSQL, backend i frontend. Migracje są stosowane przed startem API, frontend jest dostępny pod `http://localhost:5173`, a API pod `http://localhost:3000`. Dane bazy pozostają w wolumenie `boardrent-postgres-data`. Zatrzymanie usług: `docker compose down`; dodanie `-v` usuwa również dane bazy.
+
+Na Windows uruchom aplikację jedną komendą z katalogu głównego (wymagane Node.js, npm oraz Docker Desktop lub własny PostgreSQL):
 
 ```powershell
 .\dev.cmd
 ```
 
-Otwórz `http://127.0.0.1:5173`. Serwery działają w tle, a logi są w `.boardrent-dev`. Zatrzymasz oba poleceniem `.\dev.cmd stop`. Skrypt nie uruchamia ani nie zatrzymuje PostgreSQL.
+Skrypt tworzy brakujący `backend/.env` i losowy sekret JWT, instaluje brakujące lub nieaktualne zależności, generuje klienta Prisma i stosuje migracje. Jeśli lokalna baza nie odpowiada, uruchamia Docker Desktop i usługę `db` przez Compose. Przy własnej bazie używa `DATABASE_URL` z `backend/.env`; sprawdza też połączenie i dane logowania podczas migracji. Instalacja zależności może wymagać dostępu do internetu.
+
+Każde uruchomienie `dev.cmd` (również `dev.cmd restart`) restartuje serwery wcześniej uruchomione przez ten skrypt. Gotowość ogłasza dopiero po sprawdzeniu backendu, bazy i pobierania gier przez frontend. Otwórz `http://127.0.0.1:5173`. Serwery działają w tle; po późniejszej awarii uruchom ponownie `dev.cmd`.
+
+- `dev.cmd status` — sprawdza backend, frontend i połączenie z bazą.
+- `dev.cmd logs` — pokazuje ostatnie linie logów z `.boardrent-dev`.
+- `dev.cmd stop` — zatrzymuje własne serwery; baza pozostaje uruchomiona, a jej dane zachowane.
+
+Przy błędzie skrypt wypisuje etap, wskazówkę i logi oraz zwraca niezerowy kod zakończenia. Obcych procesów zajmujących porty `3000` lub `5173` nie zamyka: wskazuje port i PID. Przed przejściem z pełnego Compose na `dev.cmd` zatrzymaj kontenery `backend` i `frontend` poleceniem `docker compose stop backend frontend`. Skrypt nie monitoruje usług po zakończeniu uruchamiania.
 
 Możesz też uruchomić frontend osobno:
 
@@ -65,7 +83,7 @@ npm.cmd run dev
 
 Vite wypisze lokalny adres aplikacji w terminalu.
 
-Na stronie głównej i pod `/games` można przeglądać katalog, wyszukiwać gry, filtrować po kategorii i otwierać szczegóły. Zalogowany użytkownik może wypożyczać i zwracać gry pod `/loans`, a administrator zarządza grami, kategoriami i egzemplarzami pod `/admin`. Frontend pobiera dane z backendu przez lokalne proxy Vite. Jeśli baza nie zawiera jeszcze gier, po migracjach uruchom z katalogu `backend` `npm.cmd run db:seed-demo`, aby dodać przykładowy katalog do testów. Więcej informacji znajduje się w [frontend/README.md](./frontend/README.md).
+Na stronie głównej i pod `/games` można przeglądać katalog, wyszukiwać gry, filtrować po kategorii i otwierać szczegóły. Przycisk „i” na kafelku pokazuje informacje bez opuszczania katalogu: okazję, poziom trudności, przebieg rozgrywki, cechy i parametry gry. Administrator uzupełnia te opcjonalne pola w formularzu gry; są też widoczne na stronie szczegółów. Zalogowany użytkownik może wypożyczać i zwracać gry pod `/loans`, a administrator zarządza grami, kategoriami i egzemplarzami pod `/admin`. Frontend pobiera dane z backendu przez lokalne proxy Vite. Po migracjach uruchom z katalogu `backend` `npm.cmd run db:seed-demo`, aby dodać 14 przykładowych gier lub uzupełnić ich brakujące informacje pomocne przy wyborze. Skrypt zachowuje już uzupełnione pola. Więcej informacji znajduje się w [frontend/README.md](./frontend/README.md).
 
 Tworzenie konta administratora i uruchamianie testów opisuje [backend/README.md](./backend/README.md).
 API egzemplarzy zwraca `isAvailable`, a API gier `availableCopies`. Status `AVAILABLE` opisuje stan egzemplarza; samo wypożyczenie nie zmienia go.
