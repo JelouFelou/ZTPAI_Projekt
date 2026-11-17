@@ -18,6 +18,8 @@ Jeśli katalog jest pusty, z katalogu `backend` uruchom `npm.cmd run db:seed-dem
 
 ## Dostępne widoki
 
+Formularz rejestracji konta `USER` wymaga hasła od 8 do 128 znaków. Minimum 12 znaków dotyczy wyłącznie administratora tworzonego skryptem backendu. Hasła są weryfikowane również w API i haszowane Argon2id.
+
 - `/` — strona główna z katalogiem.
 - `/games` — katalog z wyszukiwaniem po tytule lub opisie, filtrem kategorii i paginacją.
 - `/games/:id` — szczegóły gry oraz liczba dostępnych egzemplarzy.

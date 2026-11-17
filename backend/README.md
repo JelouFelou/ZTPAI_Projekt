@@ -57,6 +57,8 @@ Po migracjach możesz dodać 14 przykładowych gier i egzemplarze dla widoku kat
 
 ## API
 
+Rejestracja konta `USER` przyjmuje hasło o długości **8–128 znaków** (`RegisterDto`, formularz React, schemat OpenAPI). Skrypt `scripts/create-admin.mjs` wymaga **12–128 znaków** dla `ADMIN`. Obie ścieżki zapisują wyłącznie hash Argon2id. Logowanie nie narzuca ponownie minimalnej długości i nie zmienia dotychczasowych haseł.
+
 Wszystkie endpointy są dostępne pod prefiksem `/api`.
 
 ### Uwierzytelnianie
@@ -66,7 +68,7 @@ Wszystkie endpointy są dostępne pod prefiksem `/api`.
 - `GET /api/auth/verify` — weryfikuje token przekazany w nagłówku `Authorization: Bearer <token>`
 - `GET /api/auth/me` — zwraca profil zalogowanego użytkownika; wymaga tokenu `Bearer`
 
-Hasła są haszowane Argon2id. E-mail jest przy rejestracji normalizowany do małych liter. Hasło musi mieć 12–128 znaków. Rejestracja nie przyjmuje roli od klienta i nie zwraca hasła ani jego hashu. Błędne dane logowania zwracają ten sam komunikat `401`; dla nieistniejącego konta wykonywana jest również weryfikacja Argon2id, aby ograniczyć różnice czasu odpowiedzi. Sekret JWT musi być unikalny, przechowywany poza repozytorium i mieć co najmniej 32 bajty.
+Hasła są haszowane Argon2id. E-mail jest przy rejestracji normalizowany do małych liter. Hasło użytkownika USER musi mieć 8–128 znaków. Rejestracja nie przyjmuje roli od klienta i nie zwraca hasła ani jego hashu. Błędne dane logowania zwracają ten sam komunikat `401`; dla nieistniejącego konta wykonywana jest również weryfikacja Argon2id, aby ograniczyć różnice czasu odpowiedzi. Sekret JWT musi być unikalny, przechowywany poza repozytorium i mieć co najmniej 32 bajty.
 
 ### Katalog
 

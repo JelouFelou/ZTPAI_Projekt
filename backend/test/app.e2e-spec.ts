@@ -238,6 +238,48 @@ describe('BoardRent API (e2e)', () => {
     expect(createArgs.data.passwordHash).not.toBe(validPassword);
   });
 
+  it.each([8, 128])(
+    'accepts a %i-character USER password and hashes it with Argon2id',
+    async (length) => {
+      prisma.user.create.mockResolvedValue(user);
+      const password = 'a'.repeat(length);
+      await request(app.getHttpServer())
+        .post('/api/auth/register')
+        .send({
+          email: user.email,
+          password,
+          firstName: 'Ada',
+          lastName: 'Test',
+        })
+        .expect(201);
+      const hash = prisma.user.create.mock.calls[0][0].data.passwordHash;
+      expect(hash).toMatch(/^\$argon2id\$/);
+      await expect(argon2.verify(hash, password)).resolves.toBe(true);
+    },
+  );
+
+  it.each([7, 129])('rejects a %i-character USER password', async (length) => {
+    await request(app.getHttpServer())
+      .post('/api/auth/register')
+      .send({
+        email: user.email,
+        password: 'a'.repeat(length),
+        firstName: 'Ada',
+        lastName: 'Test',
+      })
+      .expect(400);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('documents USER password limits in OpenAPI', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/docs-json')
+      .expect(200);
+    expect(
+      response.body.components.schemas.RegisterDto.properties.password,
+    ).toMatchObject({ minLength: 8, maxLength: 128, writeOnly: true });
+  });
+
   it('rejects duplicate registration emails with 409', async () => {
     const { Prisma } = await import('@prisma/client');
     prisma.user.create.mockRejectedValue(

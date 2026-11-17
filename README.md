@@ -26,6 +26,8 @@ API domyślnie działa pod `http://localhost:3000`. `.env.example` zawiera ustaw
 
 ## API
 
+Hasło użytkownika rejestrującego się przez formularz/API musi mieć **8–128 znaków**. Hasło administratora tworzonego skryptem musi mieć **12–128 znaków**. Oba rodzaje haseł są haszowane Argon2id. Różne minima są celowe; nie zmieniają istniejących haseł.
+
 - `/api/auth/register` i `/api/auth/login` — rejestracja i logowanie
 - `/api/auth/verify` — weryfikacja tokenu Bearer
 - `/api/categories` — kategorie gier

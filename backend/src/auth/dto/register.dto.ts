@@ -14,6 +14,8 @@ export class RegisterDto {
   @ApiProperty({
     minLength: 8,
     maxLength: 128,
+    description:
+      'USER registration password: 8–128 characters. Stored as an Argon2id hash.',
     writeOnly: true,
     example: 'correct-horse-battery-staple',
   })
