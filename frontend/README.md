@@ -31,6 +31,8 @@ Filtry, rozmiar strony i numer strony są zapisane w adresie. Można skopiować 
 
 ## Kontrole
 
+Filtry panelu wypożyczeń administratora: „Wszystkie” obejmuje całą historię, „W terminie” wybiera `ACTIVE` z `dueAt >= teraz`, „Przeterminowane” wybiera `ACTIVE` z `dueAt < teraz`, a „Zwrócone” wybiera `RETURNED`. Filtrowanie i paginacja odbywają się w API. Daty są pokazywane po polsku w strefie `Europe/Warsaw`, niezależnie od strefy przeglądarki.
+
 Potwierdzenie odebrania konkretnego, kompletnego egzemplarza uruchamia wypożyczenie, a potwierdzenie fizycznego oddania je zamyka. Daty tych operacji są widoczne w wypożyczeniu i pobieranym potwierdzeniu. Na stronie gry i w okienku „i” widać liczbę dostępnych i wypożyczonych kopii oraz planowane zwroty. Terminy po czasie są oznaczone jako zaległe. Układ stron korzysta z szerokości okna; katalog automatycznie dobiera liczbę kolumn, a aktywne wypożyczenie i historia na szerokim ekranie stoją obok siebie.
 
 ```powershell

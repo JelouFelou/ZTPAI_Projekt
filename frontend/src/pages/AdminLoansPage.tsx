@@ -4,22 +4,15 @@ import { useAuth } from "../authContext";
 import AdminTabs from "../components/AdminTabs";
 import Link from "../components/Link";
 import { navigate } from "../navigation";
+import { loanDate as date } from "../loanFormatting";
 
 type Filter = "all" | "active" | "returned" | "overdue";
 const filters: { id: Filter; label: string }[] = [
   { id: "all", label: "Wszystkie" },
-  { id: "active", label: "Aktywne" },
-  { id: "returned", label: "Zwrócone" },
+  { id: "active", label: "W terminie" },
   { id: "overdue", label: "Przeterminowane" },
+  { id: "returned", label: "Zwrócone" },
 ];
-const dateTime = new Intl.DateTimeFormat("pl-PL", {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
-
-function date(value: string) {
-  return dateTime.format(new Date(value));
-}
 
 function routeFor(filter: Filter, page: number) {
   const params = new URLSearchParams({ tab: "loans" });
@@ -49,7 +42,7 @@ function loanStatus(loan: AdminLoan, now: number) {
       text: "Przeterminowane",
       className: "loan-status loan-status--overdue",
     };
-  return { text: "Aktywne", className: "loan-status" };
+  return { text: "W terminie", className: "loan-status" };
 }
 
 export default function AdminLoansPage({ route }: { route: string }) {
