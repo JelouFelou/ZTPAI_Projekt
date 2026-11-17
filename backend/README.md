@@ -95,13 +95,19 @@ Historia domyślnie obejmuje statusy `ACTIVE` i `RETURNED`. Oba endpointy listow
 
 ### Zdarzenia i przypomnienia
 
-Po pomyślnym wypożyczeniu backend emituje asynchroniczne zdarzenie i zapisuje powiadomienie `LOAN_BORROWED` w bazie. Scheduler sprawdza zaległości także po uruchomieniu aplikacji, a następnie codziennie o 9:00 czasu polskiego. Zapisuje po jednym przypomnieniu `LOAN_OVERDUE_REMINDER` na aktywne wypożyczenie po terminie. Obraz backendu ustawia strefę `Europe/Warsaw`. Unikalność typu przypomnienia i wypożyczenia zapobiega duplikatom przy kolejnych uruchomieniach. Zdarzenia wypożyczenia są przetwarzane w pamięci procesu: nagłe wyłączenie backendu tuż po odpowiedzi API może spowodować utratę powiadomienia. Powiadomienia są obecnie rekordami w bazie; aplikacja nie wysyła wiadomości e-mail ani nie pokazuje ich w interfejsie.
 
 Wpis zawiera daty, status i informacje o egzemplarzu oraz grze. Widok administratora dodaje pole `user` z `id`, `email`, `firstName` i `lastName`, bez hasła i jego hashu. Zwykły użytkownik otrzymuje `403` dla `GET /api/loans`; brak tokenu na obu endpointach zwraca `401`. Niepoprawne filtry i nieznane parametry zwracają `400`. Przykłady: `GET /api/loans/me?status=RETURNED&page=1&limit=10`, `GET /api/loans?status=ACTIVE&userId=<uuid>`.
 
 Żądania z body i parametry zapytań są walidowane; nieznane pola zwracają `400`. ID w ścieżkach muszą być UUID. Każda odpowiedź z błędem ma format `{ "error": { "code", "message", "details?", "requestId" } }`; `requestId` jest również zwracany w nagłówku `X-Request-Id`. Nieoczekiwane błędy są logowane po stronie serwera, bez ujawniania szczegółów klientowi. Usunięcie zasobu używanego przez inne rekordy zwraca `409 Conflict`.
 
-### Dokumentacja API
+
+### Powiadomienia użytkownika
+
+`GET /api/notifications/me?page=1&limit=20` wymaga tokenu JWT i zwraca tylko własne powiadomienia (`USER` i `ADMIN`), od najnowszych: `{ data: [{ id, type, message, createdAt }], pagination: { page, limit, total, totalPages } }`. `page`: 1–1000000, `limit`: 1–100; wartości domyślne to 1 i 20. Nieznane parametry, również `userId`, są odrzucane (`400`). Brak lub nieprawidłowy token albo nieistniejące konto daje `401`. Lista i licznik są pobierane w jednej transakcji `RepeatableRead`. Starsze anglojęzyczne komunikaty są lokalizowane przy odczycie na podstawie powiązanego własnego wypożyczenia, bez nadpisywania historii.
+
+Zdarzenie `LOAN_BORROWED` zapisuje potwierdzenie asynchronicznie po zatwierdzeniu wypożyczenia. Scheduler przy uruchomieniu i codziennie o 9:00 w strefie procesu zapisuje przypomnienia `LOAN_OVERDUE_REMINDER` o zaległych aktywnych wypożyczeniach. Docker ustawia `Europe/Warsaw`; przy uruchomieniu bez Dockera należy ustawić tę strefę procesu, jeśli harmonogram ma działać według czasu polskiego. Istniejące ograniczenie unikalne `(loanId, type)` i `createMany(skipDuplicates: true)` chronią przed powtórzeniami także przy równoczesnym uruchomieniu. Komunikaty i daty są prezentowane po polsku, terminy w `Europe/Warsaw`. Brak poczty, WebSocketów i oznaczania jako przeczytane. Zdarzenia są w pamięci procesu — wyłączenie go między zapisem wypożyczenia a obsługą zdarzenia może zgubić potwierdzenie; nie zmieniono tej architektury.
+
+### Swagger
 
 Swagger UI jest dostępne pod `http://localhost:3000/api/docs`; surowy dokument OpenAPI pod `http://localhost:3000/api/docs-json`.
 

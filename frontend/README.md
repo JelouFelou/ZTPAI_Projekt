@@ -25,6 +25,7 @@ Formularz rejestracji konta `USER` wymaga hasła od 8 do 128 znaków. Minimum 12
 - `/games/:id` — szczegóły gry oraz liczba dostępnych egzemplarzy.
 - `/login` i `/register` — logowanie oraz rejestracja konta.
 - `/loans` — własne wypożyczenia, terminy zwrotu i zwracanie gier.
+- `/notifications` — własne potwierdzenia wypożyczeń i przypomnienia o zaległych grach; widok dla zalogowanych, z paginacją, odświeżaniem, obsługą ładowania, błędów i pustej listy. Daty są wyświetlane po polsku w strefie `Europe/Warsaw`.
 - `/admin` — panel administratora: dodawanie, edycja i usuwanie gier, kategorii oraz egzemplarzy; zakładka „Wypożyczenia” pokazuje historię wszystkich użytkowników z filtrami i paginacją po stronie API.
 
 Wypożyczenie ma etap podsumowania: użytkownik widzi konkretny egzemplarz, okres wypożyczenia i swoje dane, a następnie zaznacza potwierdzenie i zapisuje wypożyczenie. Dopiero wtedy powstaje aktywny rekord. „Moje wypożyczenia” pokazują aktualną grę, dokładny termin w czasie polskim, czas pozostały do zwrotu oraz potwierdzenie do pobrania. Historia zwróconych gier jest osobna. Zwrot wymaga potwierdzenia oddania kompletnego egzemplarza; anulowanie okienka nie zmienia danych. Użytkownik z aktywnym wypożyczeniem od razu widzi tę informację przy kolejnej grze. Czas wypożyczenia i limit są pobierane z `GET /api/loans/policy`; ostateczną dostępność sprawdza backend podczas zapisu.

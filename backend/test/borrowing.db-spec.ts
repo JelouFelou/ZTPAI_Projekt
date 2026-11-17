@@ -117,7 +117,11 @@ it('persists only one reminder per overdue active loan', async () => {
     data: { dueAt: new Date(now.getTime() - 60_000) },
   });
 
-  await expect(notifications.recordOverdueReminders(now)).resolves.toBe(1);
+  const concurrent = await Promise.all([
+    notifications.recordOverdueReminders(now),
+    notifications.recordOverdueReminders(now),
+  ]);
+  expect(concurrent.reduce((total, count) => total + count, 0)).toBe(1);
   await expect(notifications.recordOverdueReminders(now)).resolves.toBe(0);
   expect(
     await prisma.notification.findMany({
@@ -136,6 +140,56 @@ it('persists borrowing and exposes actual availability', async () => {
     isAvailable: false,
   });
   expect(await copies.findOne(copyIds[1])).toMatchObject({ isAvailable: true });
+});
+
+it('paginates notifications without leaking another user notifications', async () => {
+  const first = await loans.borrow(userIds[0], { gameCopyId: copyIds[0] });
+  const second = await loans.borrow(userIds[1], { gameCopyId: copyIds[1] });
+  await prisma.notification.createMany({
+    data: [
+      {
+        userId: userIds[0],
+        loanId: first.id,
+        type: 'LOAN_BORROWED',
+        message: 'Pierwsze',
+        createdAt: new Date('2026-01-01T12:00:00Z'),
+      },
+      {
+        userId: userIds[0],
+        loanId: first.id,
+        type: 'LOAN_OVERDUE_REMINDER',
+        message: 'Najnowsze',
+        createdAt: new Date('2026-01-02T12:00:00Z'),
+      },
+      {
+        userId: userIds[1],
+        loanId: second.id,
+        type: 'LOAN_BORROWED',
+        message: 'Prywatne drugiego użytkownika',
+        createdAt: new Date('2026-01-03T12:00:00Z'),
+      },
+    ],
+  });
+  const page = await notifications.findMine(userIds[0], { page: 1, limit: 1 });
+  expect(page.data.map((item) => item.message)).toEqual(['Najnowsze']);
+  expect(page.pagination).toEqual({
+    page: 1,
+    limit: 1,
+    total: 2,
+    totalPages: 2,
+  });
+  expect(
+    (await notifications.findMine(userIds[0], { page: 2, limit: 1 })).data.map(
+      (item) => item.message,
+    ),
+  ).toEqual(['Pierwsze']);
+  expect(
+    (await notifications.findMine(userIds[0], { page: 3, limit: 1 })).data,
+  ).toEqual([]);
+  expect(
+    (await notifications.findMine(userIds[1], { page: 1, limit: 20 }))
+      .pagination.total,
+  ).toBe(1);
 });
 
 it('allows only one of two users to borrow the same copy concurrently', async () => {

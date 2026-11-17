@@ -8,6 +8,7 @@ import GameDetailsPage from "./pages/GameDetailsPage";
 import AuthPage from "./pages/AuthPage";
 import LoansPage from "./pages/LoansPage";
 import AdminPage from "./pages/AdminPage";
+import NotificationsPage from "./pages/NotificationsPage";
 import "./App.css";
 
 function App() {
@@ -55,6 +56,14 @@ function App() {
                 Panel admina
               </Link>
             )}
+            {user && (
+              <Link
+                href="/notifications"
+                aria-current={path === "/notifications" ? "page" : undefined}
+              >
+                Powiadomienia
+              </Link>
+            )}
           </nav>
           {user ? (
             <div className="header-account">
@@ -89,6 +98,8 @@ function App() {
         />
       ) : path === "/loans" ? (
         <LoansPage route={route} />
+      ) : path === "/notifications" ? (
+        <NotificationsPage route={route} />
       ) : path === "/admin" ? (
         <AdminPage route={route} />
       ) : (

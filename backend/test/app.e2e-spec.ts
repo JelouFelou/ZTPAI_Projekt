@@ -183,6 +183,105 @@ describe('BoardRent API (e2e)', () => {
     vi.restoreAllMocks();
   });
 
+  it.each(['USER', 'ADMIN'] as const)(
+    'returns only the authenticated %s notifications',
+    async (role) => {
+      prisma.user.findUnique.mockResolvedValue({ ...user, role });
+      const token = await createAccessToken(app, role);
+      const createdAt = new Date('2026-01-01T12:00:00Z');
+      prisma.notification.findMany.mockResolvedValue([
+        {
+          id: copyId,
+          userId,
+          type: 'LOAN_BORROWED',
+          createdAt,
+          message:
+            'Game borrowed: Chess (COPY-1). Return by 2026-01-15T12:00:00Z.',
+          loan: {
+            dueAt: new Date('2026-01-15T12:00:00Z'),
+            gameCopy: { inventoryCode: 'COPY-1', game: { title: 'Chess' } },
+          },
+        },
+      ]);
+      prisma.notification.count.mockResolvedValue(3);
+      const response = await request(app.getHttpServer())
+        .get('/api/notifications/me?page=2&limit=1')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(response.body).toEqual({
+        data: [
+          {
+            id: copyId,
+            type: 'LOAN_BORROWED',
+            message:
+              'Wypożyczono grę „Chess” (COPY-1). Termin zwrotu: 15 sty 2026, 13:00.',
+            createdAt: createdAt.toISOString(),
+          },
+        ],
+        pagination: { page: 2, limit: 1, total: 3, totalPages: 3 },
+      });
+      expect(prisma.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId, loan: { userId } },
+          skip: 1,
+          take: 1,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        }),
+      );
+      expect(prisma.notification.count).toHaveBeenCalledWith({
+        where: { userId, loan: { userId } },
+      });
+    },
+  );
+
+  it('requires a valid token and an existing account for notifications', async () => {
+    await request(app.getHttpServer()).get('/api/notifications/me').expect(401);
+    await request(app.getHttpServer())
+      .get('/api/notifications/me')
+      .set('Authorization', 'Bearer invalid')
+      .expect(401);
+    const token = await createAccessToken(app, 'USER');
+    await request(app.getHttpServer())
+      .get('/api/notifications/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(401);
+    expect(prisma.notification.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'page=0',
+    'page=-1',
+    'page=1.5',
+    'page=no',
+    'page=1000001',
+    'limit=0',
+    'limit=101',
+    'limit=1.5',
+    'userId=other',
+    'loanId=other',
+  ])('rejects invalid notification query %s', async (query) => {
+    prisma.user.findUnique.mockResolvedValue(user);
+    const token = await createAccessToken(app, 'USER');
+    await request(app.getHttpServer())
+      .get(`/api/notifications/me?${query}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(400);
+    expect(prisma.notification.findMany).not.toHaveBeenCalled();
+  });
+
+  it('documents the protected paginated notifications endpoint', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/docs-json')
+      .expect(200);
+    const endpoint = response.body.paths['/api/notifications/me'].get;
+    expect(endpoint.security).toContainEqual({ 'access-token': [] });
+    expect(
+      endpoint.parameters.map((item: { name: string }) => item.name),
+    ).toEqual(expect.arrayContaining(['page', 'limit']));
+    for (const code of ['200', '400', '401', '500'])
+      expect(endpoint.responses[code]).toBeDefined();
+  });
+
   it('returns the API health response', () => {
     return request(app.getHttpServer())
       .get('/api')

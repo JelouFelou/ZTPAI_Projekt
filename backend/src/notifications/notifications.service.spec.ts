@@ -8,7 +8,12 @@ function setup() {
     notification: {
       create: vi.fn().mockResolvedValue(undefined),
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
     },
+    $transaction: vi
+      .fn()
+      .mockImplementation((operations) => Promise.all(operations)),
   };
   return {
     prisma,
@@ -33,7 +38,7 @@ describe('NotificationsService', () => {
         loanId: 'loan',
         type: NotificationType.LOAN_BORROWED,
         message:
-          'Game borrowed: Chess (COPY-1). Return by 2026-01-15T12:00:00.000Z.',
+          'Wypożyczono grę „Chess” (COPY-1). Termin zwrotu: 15 sty 2026, 13:00.',
       },
     });
   });
@@ -78,7 +83,7 @@ describe('NotificationsService', () => {
           loanId: 'loan',
           type: NotificationType.LOAN_OVERDUE_REMINDER,
           message:
-            'Overdue loan: Chess (COPY-1), due 2026-01-31T12:00:00.000Z.',
+            'Wypożyczenie gry „Chess” (COPY-1) jest przeterminowane. Termin zwrotu: 31 sty 2026, 13:00. Prosimy o zwrot egzemplarza.',
         },
       ],
       skipDuplicates: true,
@@ -93,5 +98,41 @@ describe('NotificationsService', () => {
     ).resolves.toBe(0);
 
     expect(prisma.notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('scopes the list and count to the owner and paginates newest first', async () => {
+    const { service, prisma } = setup();
+    prisma.notification.count.mockResolvedValue(25);
+    const result = await service.findMine('owner', { page: 2, limit: 10 });
+    expect(prisma.notification.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 'owner', loan: { userId: 'owner' } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: 10,
+        take: 10,
+      }),
+    );
+    expect(prisma.notification.count).toHaveBeenCalledWith({
+      where: { userId: 'owner', loan: { userId: 'owner' } },
+    });
+    expect(result.pagination).toEqual({
+      page: 2,
+      limit: 10,
+      total: 25,
+      totalPages: 3,
+    });
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Array), {
+      isolationLevel: 'RepeatableRead',
+    });
+  });
+
+  it('returns an empty notification page with zero totalPages', async () => {
+    const { service } = setup();
+    await expect(
+      service.findMine('owner', { page: 1, limit: 20 }),
+    ).resolves.toEqual({
+      data: [],
+      pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
   });
 });

@@ -81,6 +81,18 @@ export interface PaginatedLoans {
   pagination: PaginatedGames["pagination"];
 }
 
+export interface UserNotification {
+  id: string;
+  type: "LOAN_BORROWED" | "LOAN_OVERDUE_REMINDER";
+  message: string;
+  createdAt: string;
+}
+
+export interface PaginatedNotifications {
+  data: UserNotification[];
+  pagination: PaginatedGames["pagination"];
+}
+
 export interface AdminLoan extends Loan {
   user: {
     id: string;

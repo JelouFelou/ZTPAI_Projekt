@@ -4,9 +4,12 @@ import { LoanEvents } from './loan-events.js';
 import { LoanEventsListener } from './loan-events.listener.js';
 import { NotificationsService } from './notifications.service.js';
 import { OverdueLoansScheduler } from './overdue-loans.scheduler.js';
+import { AuthModule } from '../auth/auth.module.js';
+import { NotificationsController } from './notifications.controller.js';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AuthModule],
+  controllers: [NotificationsController],
   providers: [
     LoanEvents,
     LoanEventsListener,
