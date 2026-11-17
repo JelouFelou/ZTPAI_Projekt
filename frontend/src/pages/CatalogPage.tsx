@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { getCategories, getGames } from "../api";
 import type { Category, PaginatedGames } from "../api";
 import Link from "../components/Link";
 import { navigate } from "../navigation";
 import GameCard from "../components/GameCard";
+import { catalogPageSize } from "../catalogPageSize";
 
 const PAGE_SIZE = 12;
 
@@ -95,8 +96,12 @@ export default function CatalogPage({
   showHero: boolean;
   route: string;
 }) {
+  const catalogRef = useRef<HTMLElement>(null);
+  const previousColumns = useRef(0);
+  const [columns, setColumns] = useState(1);
   const filters = readFilters(route);
-  const search = searchFor(filters);
+  const pageSize = catalogPageSize(filters.limit, columns);
+  const search = searchFor({ ...filters, limit: pageSize });
   const [draftState, setDraftState] = useState({
     query: filters.q,
     value: filters.q,
@@ -115,6 +120,38 @@ export default function CatalogPage({
   const loading = request?.key !== requestKey;
   const result = loading ? null : request.data;
   const error = loading ? "" : request.error;
+
+  useLayoutEffect(() => {
+    const section = catalogRef.current;
+    if (!section) return;
+    const measure = () => {
+      const grid = section.querySelector(".game-grid");
+      if (!grid) return;
+      const tracks = getComputedStyle(grid).gridTemplateColumns;
+      if (!tracks || tracks === "none") return;
+      const nextColumns = tracks.trim().split(/\s+/).length;
+      if (nextColumns === previousColumns.current) return;
+      const wasMeasured = previousColumns.current > 0;
+      previousColumns.current = nextColumns;
+      setColumns(nextColumns);
+      const current = readFilters(route);
+      if (wasMeasured && current.page > 1)
+        navigate(`/games${searchFor({ ...current, page: 1 })}`);
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(section);
+    measure();
+    return () => observer.disconnect();
+  }, [route]);
+
+  useEffect(() => {
+    if (
+      result &&
+      result.pagination.totalPages > 0 &&
+      filters.page > result.pagination.totalPages
+    )
+      navigate(`/games${searchFor({ ...readFilters(route), page: 1 })}`);
+  }, [result, filters.page, route]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -161,6 +198,7 @@ export default function CatalogPage({
     <main>
       {showHero && <Hero />}
       <section
+        ref={catalogRef}
         className="catalog-section container"
         id="katalog"
         aria-labelledby="catalog-title"
@@ -267,9 +305,11 @@ export default function CatalogPage({
                 }
                 aria-label="Liczba gier na stronę"
               >
-                <option value="12">12</option>
-                <option value="24">24</option>
-                <option value="48">48</option>
+                {[12, 24, 48].map((size) => (
+                  <option key={size} value={size}>
+                    {catalogPageSize(size, columns)}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
@@ -291,16 +331,18 @@ export default function CatalogPage({
           </div>
         ) : loading ? (
           <div className="game-grid" aria-label="Ładowanie gier">
-            {[0, 1, 2, 3, 4, 5].map((item) => (
-              <div className="game-card skeleton-card" key={item}>
-                <div className="skeleton-art" />
-                <div className="skeleton-lines">
-                  <span />
-                  <span />
-                  <span />
+            {Array.from({ length: pageSize }, (_, index) => index).map(
+              (item) => (
+                <div className="game-card skeleton-card" key={item}>
+                  <div className="skeleton-art" />
+                  <div className="skeleton-lines">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ),
+            )}
           </div>
         ) : result && result.data.length ? (
           <div className="game-grid">
@@ -308,7 +350,7 @@ export default function CatalogPage({
               <GameCard
                 key={game.id}
                 game={game}
-                index={(page - 1) * filters.limit + index}
+                index={(page - 1) * pageSize + index}
               />
             ))}
           </div>
