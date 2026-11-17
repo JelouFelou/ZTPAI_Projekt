@@ -5,6 +5,7 @@ import Link from "../components/Link";
 import { navigate } from "../navigation";
 import GameCard from "../components/GameCard";
 import { catalogPageSize } from "../catalogPageSize";
+import "./CatalogPage.css";
 
 const PAGE_SIZE = 12;
 
@@ -193,95 +194,109 @@ export default function CatalogPage({
         id="katalog"
         aria-labelledby="catalog-title"
       >
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">KATALOG · TWOJE NASTĘPNE ODKRYCIE</p>
+        <div className="catalog-panel">
+          <header className="catalog-panel__heading">
             <h2 id="catalog-title">
-              Znajdź grę <span>dla siebie.</span>
+              Katalog <span>gier</span>
             </h2>
-            <p>
-              Od szybkiej rozgrywki po całonocną przygodę — wybór należy do
-              Ciebie.
-            </p>
-          </div>
-          <span className="section-spark" aria-hidden="true">
-            ✳
-          </span>
-        </div>
-        <div className="catalog-filters">
-          <label className="category-field catalog-category">
-            <span className="field-label">Kategoria</span>
-            <select
-              value={filters.categoryId}
-              onChange={(event) =>
-                changeFilters({ categoryId: event.target.value })
-              }
+            <p>Znajdź swój następny tytuł i sprawdź dostępność egzemplarzy.</p>
+          </header>
+          <div className="catalog-panel__toolbar">
+            <div
+              className="catalog-categories"
+              role="group"
+              aria-label="Kategorie gier"
             >
-              <option value="">Wszystkie kategorie</option>
+              <button
+                type="button"
+                className="catalog-category-chip"
+                aria-pressed={!filters.categoryId}
+                onClick={() => changeFilters({ categoryId: "" })}
+              >
+                Wszystkie gry
+              </button>
               {categories.map((category) => (
-                <option key={category.id} value={category.id}>
+                <button
+                  key={category.id}
+                  type="button"
+                  className="catalog-category-chip"
+                  aria-pressed={filters.categoryId === category.id}
+                  onClick={() => changeFilters({ categoryId: category.id })}
+                >
                   {category.name}
-                </option>
+                </button>
               ))}
               {filters.categoryId &&
                 !categories.some(
                   (category) => category.id === filters.categoryId,
                 ) && (
-                  <option value={filters.categoryId}>Wybrana kategoria</option>
+                  <button
+                    type="button"
+                    className="catalog-category-chip"
+                    aria-pressed="true"
+                    onClick={() => changeFilters({ categoryId: "" })}
+                  >
+                    Wybrana kategoria ×
+                  </button>
                 )}
-            </select>
-          </label>
-        </div>
-        {categoriesError && (
-          <p className="filter-hint" role="status">
-            Nie udało się pobrać kategorii. Wyszukiwanie gier nadal działa.
-            <button
-              type="button"
-              onClick={() => {
-                setCategoriesError(false);
-                setCategoryRetry((value) => value + 1);
-              }}
-            >
-              Spróbuj ponownie
-            </button>
-          </p>
-        )}
-        <div className="results-bar">
-          <p aria-live="polite">
-            {loading ? (
-              "Szukamy gier…"
-            ) : error ? (
-              "Nie udało się pobrać listy"
-            ) : (
-              <>
-                <strong>{total}</strong>{" "}
-                {total === 1 ? "gra" : total > 1 && total < 5 ? "gry" : "gier"}{" "}
-                w katalogu
-              </>
-            )}
-          </p>
-          <div className="results-actions">
+            </div>
+          </div>
+          {categoriesError && (
+            <p className="filter-hint" role="status">
+              Nie udało się pobrać kategorii. Wyszukiwanie gier nadal działa.
+              <button
+                type="button"
+                onClick={() => {
+                  setCategoriesError(false);
+                  setCategoryRetry((value) => value + 1);
+                }}
+              >
+                Spróbuj ponownie
+              </button>
+            </p>
+          )}
+          <div className="results-bar catalog-panel__results">
+            <div className="catalog-results-context">
+              <p aria-live="polite">
+                {loading ? (
+                  "Szukamy gier…"
+                ) : error ? (
+                  "Nie udało się pobrać listy"
+                ) : (
+                  <>
+                    Znaleziono: <strong>{total}</strong>
+                  </>
+                )}
+              </p>
+              {filters.q && (
+                <span className="catalog-search-context">
+                  Wyniki dla: <strong>„{filters.q}”</strong>
+                </span>
+              )}
+            </div>
             {(filters.q || filters.categoryId) && (
               <Link className="clear-link" href="/games">
-                Wyczyść filtry
+                Wyczyść filtry <span aria-hidden="true">×</span>
               </Link>
             )}
-            <label>
-              Na stronę{" "}
-              <select
-                value={filters.limit}
-                onChange={(event) =>
-                  changeFilters({ limit: Number(event.target.value) })
-                }
-                aria-label="Liczba gier na stronę"
-              >
-                {[12, 24, 48].map((size) => (
-                  <option key={size} value={size}>
-                    {catalogPageSize(size, columns)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="results-actions catalog-page-size">
+              <label>
+                Na stronę{" "}
+                <select
+                  value={filters.limit}
+                  onChange={(event) =>
+                    changeFilters({ limit: Number(event.target.value) })
+                  }
+                  aria-label="Liczba gier na stronę"
+                >
+                  {[12, 24, 48].map((size) => (
+                    <option key={size} value={size}>
+                      {catalogPageSize(size, columns)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </div>
         </div>
         {error ? (
