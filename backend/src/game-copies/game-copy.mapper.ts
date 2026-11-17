@@ -14,6 +14,7 @@ export function toGameCopyResponse(
     inventoryCode: copy.inventoryCode,
     status: copy.status,
     isAvailable: copy.status === 'AVAILABLE' && copy._count.loans === 0,
+    isBorrowed: copy._count.loans > 0,
     gameId: copy.gameId,
     game: {
       id: copy.game.id,

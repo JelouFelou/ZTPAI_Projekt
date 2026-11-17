@@ -99,6 +99,7 @@ const { _count: _copyCount, ...copyFields } = gameCopy;
 const gameCopyResponse = {
   ...copyFields,
   isAvailable: true,
+  isBorrowed: false,
   createdAt: gameCopy.createdAt.toISOString(),
   updatedAt: gameCopy.updatedAt.toISOString(),
 };
@@ -1251,6 +1252,29 @@ describe('BoardRent API (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(204);
   });
+
+  it.each([
+    ['AVAILABLE', 0, true, false],
+    ['AVAILABLE', 1, false, true],
+    ['MAINTENANCE', 0, false, false],
+    ['MAINTENANCE', 1, false, true],
+    ['RETIRED', 0, false, false],
+    ['RETIRED', 1, false, true],
+  ])(
+    'distinguishes technical status %s with %i active loans',
+    async (status, activeLoans, isAvailable, isBorrowed) => {
+      prisma.gameCopy.findUnique.mockResolvedValue({
+        ...gameCopy,
+        status,
+        _count: { loans: activeLoans },
+      });
+      const response = await request(app.getHttpServer())
+        .get(`/api/game-copies/${copyId}`)
+        .expect(200);
+      expect(response.body).toMatchObject({ status, isAvailable, isBorrowed });
+      expect(response.body).not.toHaveProperty('_count');
+    },
+  );
 
   it('reports borrowed and maintenance copies as unavailable', async () => {
     prisma.gameCopy.findUnique.mockResolvedValue({

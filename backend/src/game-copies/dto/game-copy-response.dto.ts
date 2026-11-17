@@ -21,6 +21,11 @@ export class GameCopyResponseDto {
   @ApiProperty({ description: 'AVAILABLE and without an active loan' })
   isAvailable!: boolean;
 
+  @ApiProperty({
+    description: 'Has an active loan, regardless of technical status',
+  })
+  isBorrowed!: boolean;
+
   @ApiProperty({ format: 'uuid' })
   gameId!: string;
 

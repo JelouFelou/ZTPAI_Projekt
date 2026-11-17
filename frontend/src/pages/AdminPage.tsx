@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { gameCopyStatus } from "../gameCopyStatus";
 import { getAllGames, getCategories, getGameCopies } from "../api";
 import type { Category, Game, GameCopy } from "../api";
 import { useAuth } from "../authContext";
@@ -13,11 +14,6 @@ const labels: Record<Section, string> = {
   games: "Gry",
   categories: "Kategorie",
   copies: "Egzemplarze",
-};
-const copyStatus: Record<GameCopy["status"], string> = {
-  AVAILABLE: "Dostępny",
-  MAINTENANCE: "W naprawie",
-  RETIRED: "Wycofany",
 };
 
 export default function AdminPage({ route }: { route: string }) {
@@ -402,11 +398,7 @@ export default function AdminPage({ route }: { route: string }) {
                             <div>
                               <h3>{copy.inventoryCode}</h3>
                               <p>
-                                {copy.game.title} · {copyStatus[copy.status]}
-                                {copy.status === "AVAILABLE" &&
-                                !copy.isAvailable
-                                  ? " · wypożyczony"
-                                  : ""}
+                                {copy.game.title} · {gameCopyStatus(copy)}
                               </p>
                             </div>
                             <div className="admin-item__actions">

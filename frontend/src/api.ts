@@ -55,6 +55,7 @@ export interface GameCopy {
   game: { id: string; title: string };
   status: "AVAILABLE" | "MAINTENANCE" | "RETIRED";
   isAvailable: boolean;
+  isBorrowed: boolean;
 }
 
 export interface Loan {
