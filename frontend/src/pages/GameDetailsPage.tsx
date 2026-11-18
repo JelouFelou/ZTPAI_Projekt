@@ -90,11 +90,7 @@ export default function GameDetailsPage({ id }: { id: string }) {
                 className="game-showcase"
                 aria-label="Prezentacja i parametry gry"
               >
-                <GameArtwork
-                  title={game.title}
-                  variant={game.title.length % 4}
-                  large
-                />
+                <GameArtwork game={game} large />
                 <dl className="game-showcase__facts">
                   <div>
                     <dt>Gracze</dt>

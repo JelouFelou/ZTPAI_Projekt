@@ -494,15 +494,18 @@
   background: #ebe0ff;
   color: #7541aa;
 }
-.game-art--1 {
+.game-art--1,
+.search-suggestion__art[data-variant="1"] {
   background: #fce4d4;
   color: #b66538;
 }
-.game-art--2 {
+.game-art--2,
+.search-suggestion__art[data-variant="2"] {
   background: #d9eee8;
   color: #32816f;
 }
-.game-art--3 {
+.game-art--3,
+.search-suggestion__art[data-variant="3"] {
   background: #e6e8fb;
   color: #646ab4;
 }

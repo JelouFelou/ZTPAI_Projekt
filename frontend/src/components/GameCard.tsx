@@ -3,19 +3,18 @@ import type { Game } from "../api";
 import Link from "./Link";
 import GameInfoDialog from "./GameInfoDialog";
 import { formatDuration, formatPlayers } from "../gameFormatting";
+import { gameArtworkVariant } from "../gameArtworkVariant";
 
 export function GameArtwork({
-  title,
-  variant = 0,
+  game,
   large = false,
 }: {
-  title: string;
-  variant?: number;
+  game: Pick<Game, "id" | "title">;
   large?: boolean;
 }) {
   return (
     <div
-      className={`game-art game-art--${variant % 4}${large ? " game-art--large" : ""}`}
+      className={`game-art game-art--${gameArtworkVariant(game.id)}${large ? " game-art--large" : ""}`}
       aria-hidden="true"
     >
       <div className="game-art__orbit game-art__orbit--one" />
@@ -23,24 +22,18 @@ export function GameArtwork({
       <div className="game-art__tile game-art__tile--one" />
       <div className="game-art__tile game-art__tile--two" />
       <div className="game-art__letter">
-        {title.trim().charAt(0).toLocaleUpperCase("pl")}
+        {game.title.trim().charAt(0).toLocaleUpperCase("pl")}
       </div>
       <span className="game-art__caption">BOARDRENT · GRA PLANSZOWA</span>
     </div>
   );
 }
 
-export default function GameCard({
-  game,
-  index,
-}: {
-  game: Game;
-  index: number;
-}) {
+export default function GameCard({ game }: { game: Game }) {
   const [showInfo, setShowInfo] = useState(false);
   return (
     <article className="game-card">
-      <GameArtwork title={game.title} variant={index} />
+      <GameArtwork game={game} />
       <div className="game-card__body">
         <div className="card-topline">
           <span className="category-label">{game.category.name}</span>

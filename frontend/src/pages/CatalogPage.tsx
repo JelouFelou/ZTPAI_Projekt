@@ -331,12 +331,8 @@ export default function CatalogPage({
           </div>
         ) : result && result.data.length ? (
           <div className="game-grid">
-            {result.data.map((game, index) => (
-              <GameCard
-                key={game.id}
-                game={game}
-                index={(page - 1) * pageSize + index}
-              />
+            {result.data.map((game) => (
+              <GameCard key={game.id} game={game} />
             ))}
           </div>
         ) : (

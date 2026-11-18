@@ -7,6 +7,7 @@
   padding-block: 16px;
 }
 .header-search {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -16,6 +17,108 @@
   background: #fff;
   border: 1px solid #e2d8e9;
   border-radius: 13px;
+}
+.search-suggestions {
+  position: absolute;
+  z-index: 20;
+  inset: calc(100% + 9px) -1px auto;
+  padding-top: 14px;
+  border: 1px solid #e4d9ec;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 16px 40px #30203f1c;
+  overflow: hidden;
+}
+.search-suggestions__heading {
+  margin: 0;
+  padding: 0 16px 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 700;
+  color: #9a84ac;
+}
+.search-suggestions__message {
+  margin: 0;
+  padding: 6px 16px 18px;
+  color: #817487;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.search-suggestions__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: min(330px, 45dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.search-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.search-suggestion:hover,
+.search-suggestion[aria-selected="true"] {
+  background: #f6f0fc;
+}
+.search-suggestion__art {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  color: #7541aa;
+  background: #ebe0ff;
+  font-size: 21px;
+  font-weight: 800;
+}
+.search-suggestion__copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  flex: 1;
+}
+.search-suggestion__copy strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: #44324f;
+  overflow-wrap: anywhere;
+}
+.search-suggestion__copy small {
+  font-size: 10px;
+  color: #9a8ba5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-suggestion__availability {
+  font-size: 9px;
+  color: #a18d9a;
+  flex-shrink: 0;
+}
+.search-suggestion__availability--yes {
+  color: #358568;
+}
+.header-search .search-suggestions__all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border-top: 1px solid #f0e8f5;
+  border-radius: 0;
+  background: #fcfaff;
+  color: #7542a5;
+  text-align: left;
+  font-size: 11px;
+}
+.header-search .search-suggestions__all:hover {
+  background: #f3ebfa;
 }
 .header-search:focus-within {
   border-color: #a578cd;

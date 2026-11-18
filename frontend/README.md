@@ -18,6 +18,8 @@ Jeśli katalog jest pusty, z katalogu `backend` uruchom `npm.cmd run db:seed-dem
 
 ## Dostępne widoki
 
+Podczas wpisywania w nagłówku pojawia się do pięciu pasujących gier z kategorią i dostępnością. Kliknięcie albo wybór strzałkami i Enter otwiera grę; Enter bez wyboru oraz „Pokaż wszystkie wyniki” otwierają katalog. Escape i kliknięcie poza listą zamykają podpowiedzi. Zapytania są opóźniane o 250 ms i anulowane po zmianie tekstu; lista obsługuje ładowanie, brak wyników i błąd pobierania.
+
 Wyszukiwarka gier znajduje się w nagłówku i działa na każdej podstronie. Szuka po tytule lub opisie, otwiera wyniki w katalogu i resetuje paginację. Przy wyszukiwaniu z katalogu zachowuje kategorię i wybraną wielkość strony. W katalogu pozostaje filtr kategorii; nie ma drugiego formularza wyszukiwania.
 
 Formularz rejestracji konta `USER` wymaga hasła od 8 do 128 znaków. Minimum 12 znaków dotyczy wyłącznie administratora tworzonego skryptem backendu. Hasła są weryfikowane również w API i haszowane Argon2id.
