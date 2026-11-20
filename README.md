@@ -20,6 +20,90 @@ flowchart LR
 
 Kontrolery obsługują HTTP, DTO walidują dane, guards sprawdzają tożsamość i rolę, a serwisy realizują reguły i transakcje. Prisma zapewnia dostęp do bazy i migracje. Backend sam egzekwuje ograniczenia niezależnie od formularzy. nginx w Compose i Vite lokalnie przekazują `/api` do backendu; przy tym układzie nie trzeba konfigurować CORS.
 
+## Model bazy danych — diagram ERD
+
+Diagram odpowiada [schematowi Prisma](backend/prisma/schema.prisma) i [migracjom PostgreSQL](backend/prisma/migrations). Nazwy encji i atrybutów pochodzą z modeli Prisma; tabele w bazie to `users`, `categories`, `games`, `game_copies`, `loans` i `notifications`. PK oznacza klucz główny, FK klucz obcy, UK unikalność pojedynczego pola. `NULL` oznacza pole opcjonalne.
+
+```mermaid
+erDiagram
+  User ||--o{ Loan : wypozycza
+  User ||--o{ Notification : otrzymuje
+  Category ||--o{ Game : grupuje
+  Game ||--o{ GameCopy : posiada
+  GameCopy ||--o{ Loan : historia
+  Loan ||--o{ Notification : dotyczy
+
+  User {
+    uuid id PK
+    varchar(320) email UK
+    text passwordHash
+    varchar(100) firstName
+    varchar(100) lastName
+    UserRole role
+  }
+  Category {
+    uuid id PK
+    varchar(100) name UK
+    text description "NULL"
+  }
+  Game {
+    uuid id PK
+    uuid categoryId FK
+    varchar(200) title
+    text description "NULL"
+    int minPlayers
+    int maxPlayers
+    int recommendedAge
+    int durationMinutes
+    varchar(200) occasion "NULL"
+    GameDifficulty difficulty "NULL"
+    varchar(2000) gameplay "NULL"
+    text[] highlights
+  }
+  GameCopy {
+    uuid id PK
+    uuid gameId FK
+    varchar(64) inventoryCode UK
+    CopyStatus status
+  }
+  Loan {
+    uuid id PK
+    uuid userId FK
+    uuid gameCopyId FK
+    LoanStatus status
+    timestamptz borrowedAt
+    timestamptz dueAt
+    timestamptz returnedAt "NULL"
+  }
+  Notification {
+    uuid id PK
+    uuid userId FK
+    uuid loanId FK
+    NotificationType type
+    varchar(500) message
+    timestamptz createdAt
+  }
+```
+
+Każda relacja `||--o{` oznacza jednego wymaganego rodzica i zero lub wiele rekordów potomnych. Przykładowo egzemplarz należy do dokładnie jednej gry, ale gra może nie mieć jeszcze egzemplarzy. Jedna kopia może mieć wiele historycznych wypożyczeń. Powiadomienie wskazuje zarówno odbiorcę, jak i wypożyczenie. Wszystkie klucze obce mają `ON DELETE RESTRICT`.
+
+Diagram pokazuje najważniejsze atrybuty. Wszystkie encje mają `createdAt`, a poza Notification również `updatedAt`; daty w PostgreSQL mają typ `timestamptz(3)`. Dodatkowe ograniczenie **UNIQUE (loanId, type)** w Notification dopuszcza tylko jedno powiadomienie danego typu dla danego wypożyczenia. Pola `loanId` i `type` nie są osobno unikalne.
+
+| Typ wyliczeniowy | Wartości |
+| --- | --- |
+| UserRole | USER, ADMIN |
+| GameDifficulty | EASY, MEDIUM, HARD |
+| CopyStatus | AVAILABLE, MAINTENANCE, RETIRED |
+| LoanStatus | ACTIVE, RETURNED |
+| NotificationType | LOAN_BORROWED, LOAN_OVERDUE_REMINDER |
+
+Migracje definiują również dwa **częściowe indeksy unikalne**, których warunku nie przedstawia standardowy Mermaid ERD:
+
+- `loans_one_active_per_copy` — UNIQUE na `loans(game_copy_id)` wyłącznie dla `status = 'ACTIVE'`: jeden egzemplarz może mieć najwyżej jedno aktywne wypożyczenie.
+- `loans_one_active_per_user` — UNIQUE na `loans(user_id)` wyłącznie dla `status = 'ACTIVE'`: użytkownik może mieć najwyżej jedno aktywne wypożyczenie.
+
+Wpisy RETURNED nie podlegają tym dwóm ograniczeniom, więc historia może zawierać wiele wypożyczeń użytkownika lub egzemplarza. Indeksy są zapisane w migracjach SQL, poza deklaracjami unikalności schematu Prisma.
+
 ## Funkcje i role
 
 Katalog ma kategorie, paginację dopasowaną do kolumn, wyszukiwarkę w nagłówku z podpowiedziami, okienko informacji i szczegóły gry. Pokazuje dostępne i wypożyczone kopie oraz planowane zwroty, bez danych wypożyczających. Kolor ilustracji jest wspólny dla kafelka, podpowiedzi i szczegółów.
