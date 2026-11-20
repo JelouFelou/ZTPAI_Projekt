@@ -75,6 +75,7 @@ export class GameCopiesController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a physical game copy' })
   @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: GameCopyResponseDto })
   @ApiBadRequestResponse({ type: ApiErrorEnvelopeDto })
   @ApiNotFoundResponse({ type: ApiErrorEnvelopeDto })
   @ApiConflictResponse({ type: ApiErrorEnvelopeDto })

@@ -4,7 +4,7 @@ Katalog i panel wypożyczeń gier planszowych zbudowany w React, TypeScript i Vi
 
 ## Uruchomienie lokalne
 
-Uruchom PostgreSQL i backend według głównego `README.md`. W osobnym terminalu:
+Wymagany Node.js 22.18+ lub 24 i npm. Uruchom PostgreSQL i backend według [README projektu](../README.md). W osobnym terminalu, zaczynając od katalogu głównego repozytorium:
 
 ```powershell
 cd frontend
@@ -47,4 +47,7 @@ Potwierdzenie odebrania konkretnego, kompletnego egzemplarza uruchamia wypożycz
 ```powershell
 npm.cmd run build
 npm.cmd run lint
+npm.cmd test
 ```
+
+Polecenia kontroli uruchamiaj w katalogu `frontend`. Testy sprawdzają dopasowanie liczby gier do kolumn, cel wyszukiwania, etykiety stanów egzemplarza i daty w Europe/Warsaw; nie zastępują pełnego testu interfejsu w przeglądarce.

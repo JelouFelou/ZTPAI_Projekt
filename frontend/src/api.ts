@@ -134,7 +134,7 @@ function errorMessage(
   const serverMessage = envelope?.error?.message;
   if (status === 401)
     return hasToken
-      ? "Sesja wygasła. Zaloguj się ponownie."
+      ? "Sesja jest nieprawidłowa. Zaloguj się ponownie."
       : "Nieprawidłowy adres e-mail lub hasło.";
   if (status === 403) return "Nie masz uprawnień do wykonania tej operacji.";
   if (status === 404)

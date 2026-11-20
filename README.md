@@ -1,104 +1,152 @@
 # BoardRent
 
-Projekt aplikacji internetowej do zarządzania wypożyczalnią gier planszowych.
+Aplikacja wypożyczalni gier planszowych na ZTPAI: katalog, dostępność fizycznych egzemplarzy, potwierdzanie odbioru i zwrotu, historia i powiadomienia. Autor: Adrian Bober, 152685, adrian.bober@student.pk.edu.pl.
 
-## Cel projektu
+## Technologie i architektura
 
-Aplikacja umożliwia przeglądanie katalogu gier, sprawdzanie dostępności egzemplarzy oraz obsługę kont i wypożyczeń. Kolejne funkcje są dodawane etapami zgodnie z planem projektu.
+Frontend: React 19, TypeScript, Vite i CSS. Backend: NestJS 12, TypeScript, Prisma 6, PostgreSQL 17, JWT HS256, Argon2id, walidacja DTO i Swagger/OpenAPI. Testy: Vitest, Supertest i runner Node.js. Dokładne wersje określają pliki `package-lock.json`.
 
-## Uruchomienie lokalne
-
-Skopiuj przykładową konfigurację, ustaw własny sekret JWT i uruchom PostgreSQL oraz API:
-
-```powershell
-if (!(Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
-# W backend/.env ustaw AUTH_JWT_SECRET na losowy sekret o długości co najmniej 32 bajtów.
-cd backend
-npm.cmd ci
-npm.cmd run db:generate
-npm.cmd run db:migrate
-npm.cmd run start:dev
+```mermaid
+flowchart LR
+  Browser[Przeglądarka] --> Frontend[React / nginx lub Vite]
+  Frontend -->|/api HTTP JSON| Backend[NestJS]
+  Backend --> Prisma[Prisma Client]
+  Prisma --> DB[(PostgreSQL)]
+  Backend --> Events[Zdarzenie po wypożyczeniu]
+  Events --> Notifications[Serwis powiadomień]
+  Scheduler[Scheduler: start i 9:00] --> Notifications
+  Notifications --> Prisma
 ```
 
-Jeśli nie masz uruchomionego PostgreSQL na porcie `5432`, przed migracjami wykonaj w katalogu głównym `docker compose up -d db`. Przy istniejącej bazie pomiń ten krok i ustaw odpowiedni `DATABASE_URL` w `backend/.env`.
+Kontrolery obsługują HTTP, DTO walidują dane, guards sprawdzają tożsamość i rolę, a serwisy realizują reguły i transakcje. Prisma zapewnia dostęp do bazy i migracje. Backend sam egzekwuje ograniczenia niezależnie od formularzy. nginx w Compose i Vite lokalnie przekazują `/api` do backendu; przy tym układzie nie trzeba konfigurować CORS.
 
-API domyślnie działa pod `http://localhost:3000`. `.env.example` zawiera ustawienia lokalne; nie używaj ich w środowisku produkcyjnym. Instrukcje generowania sekretu znajdują się w [backend/README.md](./backend/README.md).
+## Funkcje i role
 
-## API
+Katalog ma kategorie, paginację dopasowaną do kolumn, wyszukiwarkę w nagłówku z podpowiedziami, okienko informacji i szczegóły gry. Pokazuje dostępne i wypożyczone kopie oraz planowane zwroty, bez danych wypożyczających. Kolor ilustracji jest wspólny dla kafelka, podpowiedzi i szczegółów.
 
-Hasło użytkownika rejestrującego się przez formularz/API musi mieć **8–128 znaków**. Hasło administratora tworzonego skryptem musi mieć **12–128 znaków**. Oba rodzaje haseł są haszowane Argon2id. Różne minima są celowe; nie zmieniają istniejących haseł.
+| Rola | Dostęp |
+| --- | --- |
+| Gość | Katalog, szczegóły, zasady, rejestracja i logowanie. |
+| USER | Wypożyczenie konkretnego egzemplarza, własny zwrot, historia, powiadomienia, pobranie potwierdzenia. |
+| ADMIN | Powyższe oraz CRUD kategorii, gier i egzemplarzy, historia wszystkich wypożyczeń z filtrami. Zwrot nadal dotyczy tylko własnych wypożyczeń. |
 
-- `/api/auth/register` i `/api/auth/login` — rejestracja i logowanie
-- `/api/auth/verify` — weryfikacja tokenu Bearer
-- `/api/categories` — kategorie gier
-- `/api/games` — gry wraz z kategorią; wyszukiwanie, filtrowanie i paginacja
-- `/api/auth/me` — profil zalogowanego użytkownika
-- `/api/game-copies` — fizyczne egzemplarze gier
-- `/api/loans` — wypożyczenie dostępnego egzemplarza; `PATCH /api/loans/:id/return` — zwrot własnego wypożyczenia
-- `GET /api/loans/me` — własna historia wypożyczeń; `GET /api/loans` — historia wszystkich użytkowników dla administratora
-
-Endpointy katalogu obsługują listowanie, pobieranie szczegółu, tworzenie, aktualizowanie i usuwanie. Swagger UI jest dostępne pod `/api/docs`.
-
-Hasła są haszowane Argon2id. Token JWT jest podpisany HS256 i dla nowych sesji nie ma limitu czasu ważności. Odczyt katalogu jest publiczny, a jego modyfikacja wymaga roli `ADMIN`; rejestracja tworzy konto `USER`. Szczegóły endpointów, odpowiedzi i konfiguracji opisuje [backend/README.md](./backend/README.md).
-
-Zalogowany użytkownik może wypożyczyć dostępny egzemplarz przez `POST /api/loans`. Wypożyczenie trwa 14 dni, a limit wynosi jedno aktywne wypożyczenie na użytkownika.
-
-Zwrot przez `PATCH /api/loans/:id/return` zapisuje `RETURNED` i datę `returnedAt`. Ponowny zwrot zwraca `409`; nieistniejące i cudze wypożyczenia zwracają `404`. Dostępność jest przeliczana automatycznie, z uwzględnieniem stanu egzemplarza.
-
-Historia obejmuje aktywne i zwrócone wypożyczenia, od najnowszych. Obsługuje `status=ACTIVE|RETURNED`, `page` i `limit`; administrator może dodatkowo filtrować po `userId` oraz po przeterminowaniu (`overdue=true|false`). Panel `/admin?tab=loans` pokazuje tę historię po 20 wpisów na stronę.
+Rejestracja tworzy USER; hasło 8–128 znaków. Administrator tworzony skryptem: 12–128 znaków. Hasła są haszowane Argon2id. Nowe JWT celowo nie mają `exp` (`expiresIn: null`), bez wylogowywania po czasie. Każde chronione żądanie sprawdza bieżące konto i rolę w bazie. Sesja jest w `sessionStorage` bieżącej karty. Wylogowanie usuwa ją i przeładowuje stronę; nie unieważnia skopiowanego tokenu na serwerze. Zmiana sekretu unieważnia wszystkie tokeny. Nie ma refresh tokenów ani endpointu logout.
 
 ## Reguły biznesowe
 
-Reguły są egzekwowane przez backend i obowiązują również przy bezpośrednim wywołaniu API:
+| Reguła | Egzekwowanie |
+| --- | --- |
+| Jedno ACTIVE na użytkownika | `LoansService`, transakcja Serializable i indeks częściowy `loans_one_active_per_user`; konflikt 409. |
+| Tylko AVAILABLE bez aktywnego wypożyczenia | Kontrola serwisu, transakcja i indeks `loans_one_active_per_copy`; konflikt 409. |
+| Jeden skuteczny zwrot | Kolejny zwrot daje 409, nie nadpisuje daty. Cudzy lub nieistniejący rekord daje 404. |
+| Egzemplarz z historią pozostaje przy tej samej grze | `GameCopiesService.update` odrzuca zmianę `gameId` przez 409, również po zwrocie; inne edycje są dozwolone. |
 
-| Reguła | Miejsce realizacji | Ochrona i wynik naruszenia |
-| --- | --- | --- |
-| Maksymalnie jedno aktywne wypożyczenie na użytkownika | [`LoansService.borrowInTransaction`](backend/src/loans/loans.service.ts), stała `MAX_ACTIVE_LOANS = 1` w [`loan-policy.ts`](backend/src/loans/loan-policy.ts) | Kontrola liczby wypożyczeń w transakcji `Serializable` i częściowy indeks unikalny dla użytkownika w [migracji](backend/prisma/migrations/20261110220000_unique_active_user_loan/migration.sql); naruszenie zwraca `409`. |
-| Można wypożyczyć tylko dostępny, niewypożyczony egzemplarz | [`LoansService.borrowInTransaction`](backend/src/loans/loans.service.ts) | Wymagane `GameCopy.status = AVAILABLE` i brak aktywnego wypożyczenia tej kopii. Transakcja oraz [częściowy indeks unikalny dla egzemplarza](backend/prisma/migrations/20261108220000_unique_active_copy_loan/migration.sql) chronią również przed równoczesnymi żądaniami; naruszenie zwraca `409`. |
-| Zakończonego wypożyczenia nie można ponownie zwrócić | [`LoansService.returnLoan`](backend/src/loans/loans.service.ts) | Zwrot wymaga własnego wypożyczenia w stanie `ACTIVE`; ponowne wywołanie daje `409`, nie nadpisuje daty zwrotu. Transakcja chroni przed równoczesnym zwrotem. |
-| Egzemplarza z historią wypożyczeń nie można przypisać do innej gry | [`GameCopiesService.update`](backend/src/game-copies/game-copies.service.ts) | Przy zmianie `gameId` sprawdzana jest cała historia wypożyczeń w transakcji `Serializable`; naruszenie zwraca `409`. Pozostałe edycje oraz pozostawienie tego samego `gameId` są dozwolone. |
+Okres to **14 × 24 godziny** od daty serwera. Potwierdzenie odbioru tworzy ACTIVE, potwierdzenie oddania zapisuje RETURNED. Zwrot nie zmienia stanu technicznego MAINTENANCE/RETIRED. Aktywne wypożyczenie po terminie również zajmuje limit użytkownika. Termin nie gwarantuje faktycznego zwrotu. Brak rezerwacji, płatności i przedłużeń.
 
-Blokada nowego wypożyczenia przy zaległej grze jest dodatkowym sprawdzeniem tej samej sytuacji co limit jednego aktywnego wypożyczenia — nie jest liczona jako piąta niezależna reguła. Okres wypożyczenia nadal wynosi **14 dni**. Reguły sprawdzają [testy serwisu](backend/src/loans/loans.service.spec.ts), [testy zwrotów](backend/src/loans/loan-returns.spec.ts), [testy API](backend/test/app.e2e-spec.ts) i [testy PostgreSQL](backend/test/borrowing.db-spec.ts).
+Konflikty serializacji ponawiają całą transakcję, maksymalnie trzy próby. Indeksy SQL chronią także przed równoczesnymi zapisami; stosuj migracje zamiast samego `prisma db push`.
 
-## Uruchomienie frontendu
+## Docker Compose
 
-### Uruchomienie całej aplikacji w Docker Compose
-
-Skonfiguruj `backend/.env`, ustawiając `AUTH_JWT_SECRET` na własny sekret, a następnie z katalogu głównego uruchom:
+Wymagania: Docker z Compose obsługującym `up --wait` (Windows: aktualny Docker Desktop, Linux containers), wolne porty 3000, 5173 i 5432. Polecenia wykonuj w PowerShell w katalogu głównym repozytorium. Dla developmentu, testów oraz skryptów danych potrzebny jest również Node.js 22.18+ lub 24 i npm; samo uruchomienie trzech kontenerów nie wymaga Node.js na hoście.
 
 ```powershell
-docker compose --env-file backend/.env up --build
+if (!(Test-Path backend/.env)) { Copy-Item backend/.env.example backend/.env }
 ```
 
-Compose uruchamia PostgreSQL, backend i frontend. Migracje są stosowane przed startem API, frontend jest dostępny pod `http://localhost:5173`, a API pod `http://localhost:3000`. Dane bazy pozostają w wolumenie `boardrent-postgres-data`. Zatrzymanie usług: `docker compose down`; dodanie `-v` usuwa również dane bazy.
-
-Na Windows uruchom aplikację jedną komendą z katalogu głównego (wymagane Node.js, npm oraz Docker Desktop lub własny PostgreSQL):
+W nieśledzonym `backend/.env` ustaw własny losowy `AUTH_JWT_SECRET` o długości co najmniej 32 bajtów. Wygeneruj go menedżerem haseł albo, jeśli masz Node.js:
 
 ```powershell
-.\dev.cmd
+node -e "console.log(require('node:crypto').randomBytes(48).toString('base64'))"
 ```
 
-Skrypt tworzy brakujący `backend/.env` i losowy sekret JWT, instaluje brakujące lub nieaktualne zależności, generuje klienta Prisma i stosuje migracje. Jeśli lokalna baza nie odpowiada, uruchamia Docker Desktop i usługę `db` przez Compose. Przy własnej bazie używa `DATABASE_URL` z `backend/.env`; sprawdza też połączenie i dane logowania podczas migracji. Instalacja zależności może wymagać dostępu do internetu.
+Nie dodawaj `.env`, haseł ani tokenów do Git. Dane PostgreSQL z `.env.example` są publiczną konfiguracją lokalną. Zmieniając `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` lub port, dostosuj `DATABASE_URL` dla skryptów na hoście. Compose buduje wewnętrzny URL do `db:5432`; użyj hasła bez znaków wymagających kodowania URL. Zmiana zmiennych PostgreSQL nie aktualizuje hasła w istniejącym wolumenie.
 
-Każde uruchomienie `dev.cmd` (również `dev.cmd restart`) restartuje serwery wcześniej uruchomione przez ten skrypt. Gotowość ogłasza dopiero po sprawdzeniu backendu, bazy i pobierania gier przez frontend. Otwórz `http://127.0.0.1:5173`. Serwery działają w tle; po późniejszej awarii uruchom ponownie `dev.cmd`.
-
-- `dev.cmd status` — sprawdza backend, frontend i połączenie z bazą.
-- `dev.cmd logs` — pokazuje ostatnie linie logów z `.boardrent-dev`.
-- `dev.cmd stop` — zatrzymuje własne serwery; baza pozostaje uruchomiona, a jej dane zachowane.
-
-Przy błędzie skrypt wypisuje etap, wskazówkę i logi oraz zwraca niezerowy kod zakończenia. Obcych procesów zajmujących porty `3000` lub `5173` nie zamyka: wskazuje port i PID. Przed przejściem z pełnego Compose na `dev.cmd` zatrzymaj kontenery `backend` i `frontend` poleceniem `docker compose stop backend frontend`. Skrypt nie monitoruje usług po zakończeniu uruchamiania.
-
-Możesz też uruchomić frontend osobno:
+Opcjonalne `POSTGRES_PORT` i `FRONTEND_PORT` w `backend/.env` zmieniają porty hosta (domyślnie 5432 i 5173). Backend w Compose ma stały port hosta 3000. Lokalne `PORT` dotyczy uruchomienia NestJS poza Compose. Zmienne ustawione już w terminalu mogą nadpisywać wartości pliku `.env`.
 
 ```powershell
-cd frontend
+docker compose --env-file backend/.env up -d --build --wait
+docker compose --env-file backend/.env ps
+```
+
+Compose czeka na bazę, stosuje istniejące migracje, uruchamia API i frontend. Pierwszy build wymaga internetu. Adresy:
+
+- Aplikacja: http://localhost:5173
+- API: http://localhost:3000/api
+- Swagger: http://localhost:3000/api/docs (również przez frontend `/api/docs`)
+- OpenAPI JSON: http://localhost:3000/api/docs-json
+
+Nowa baza ma pusty katalog. Dane dodaj według następnej sekcji. Logi: `docker compose --env-file backend/.env logs --tail 100 backend frontend db`. Zatrzymanie: `docker compose --env-file backend/.env down`. Wolumen `boardrent-postgres-data` zachowuje dane w przestrzeni projektu Compose. Nie dodawaj `-v`, jeśli chcesz je zachować.
+
+## Dane demonstracyjne i administrator
+
+Skrypty zarządzające uruchamiaj lokalnie: wymagany Node.js **22.18+ lub 24**, npm oraz działająca, zmigrowana baza. Skrypty nie są automatycznie uruchamiane przez Compose ani dołączone do obrazu backendu. `DATABASE_URL` w `backend/.env` musi wskazywać bazę przez port hosta (domyślnie localhost:5432).
+
+```powershell
+Set-Location backend
 npm.cmd ci
-npm.cmd run dev
+npm.cmd run db:generate
+npm.cmd run db:seed-demo
 ```
 
-Vite wypisze lokalny adres aplikacji w terminalu.
+Seed dodaje 14 fikcyjnych gier, kategorie i egzemplarze. Ponowne uruchomienie nie dubluje tych samych wpisów; uzupełnia brakujące pola poradnika istniejących gier demonstracyjnych. Nie usuwa historii.
 
-Na stronie głównej i pod `/games` można przeglądać katalog, wyszukiwać gry, filtrować po kategorii i otwierać szczegóły. Przycisk „i” na kafelku pokazuje informacje bez opuszczania katalogu: okazję, poziom trudności, przebieg rozgrywki, cechy i parametry gry. Administrator uzupełnia te opcjonalne pola w formularzu gry; są też widoczne na stronie szczegółów. Zalogowany użytkownik może wypożyczać i zwracać gry pod `/loans`, a administrator zarządza grami, kategoriami i egzemplarzami pod `/admin`. Frontend pobiera dane z backendu przez lokalne proxy Vite. Po migracjach uruchom z katalogu `backend` `npm.cmd run db:seed-demo`, aby dodać 14 przykładowych gier lub uzupełnić ich brakujące informacje pomocne przy wyborze. Skrypt zachowuje już uzupełnione pola. Więcej informacji znajduje się w [frontend/README.md](./frontend/README.md).
+Dla ADMIN dodaj lokalnie do `backend/.env`: `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_FIRST_NAME`, `ADMIN_LAST_NAME`. Wybierz nieużywany e-mail, hasło 12–128 znaków i imię/nazwisko 1–100 znaków. Nadal w `backend`:
 
-Tworzenie konta administratora i uruchamianie testów opisuje [backend/README.md](./backend/README.md).
-API egzemplarzy zwraca `isAvailable`, a API gier `availableCopies`. Status `AVAILABLE` opisuje stan egzemplarza; samo wypożyczenie nie zmienia go.
+```powershell
+npm.cmd run db:create-admin
+Set-Location ..
+```
+
+Skrypt tworzy nowe konto z Argon2id. Istniejącego konta nie zmienia ani nie podnosi jego roli. Po utworzeniu usuń `ADMIN_PASSWORD` z `.env`; logowanie odbywa się zwykłym formularzem. USER zarejestruj przez stronę. Repozytorium nie udostępnia wspólnego hasła do konta.
+
+## Development na Windows
+
+Alternatywą dla pełnego Compose jest `dev.cmd` (Node/npm, Docker Desktop lub własny PostgreSQL). Nie uruchamiaj obu wariantów na tych samych portach. Przed przełączeniem: `docker compose --env-file backend/.env stop backend frontend`.
+
+```powershell
+$env:TZ = 'Europe/Warsaw'
+.\dev.cmd
+.\dev.cmd status
+.\dev.cmd logs
+```
+
+Launcher przygotowuje brakującą konfigurację i sekret, zależności, Prisma Client i migracje, w razie potrzeby uruchamia bazę oraz restartuje własne serwery. Sprawdza API, bazę i katalog przez frontend; przy błędzie pokazuje etap i logi. Nie zamyka obcych procesów na portach. `dev.cmd restart` restartuje serwery, a `dev.cmd stop` zatrzymuje własne procesy bez usuwania bazy. Nie monitoruje usług po zakończeniu startu. Dla lokalnego schedulera ustaw `TZ=Europe/Warsaw` przed startem backendu.
+
+Ręczny start API w `backend`: `npm.cmd ci`, `npm.cmd run db:generate`, `npm.cmd run db:deploy`, `npm.cmd run start:dev`. W drugim terminalu w `frontend`: `npm.cmd ci`, `npm.cmd run dev`. Konfiguracja: `DATABASE_URL`, `AUTH_JWT_SECRET`, opcjonalnie `PORT` (3000). Proxy Vite zakłada port 3000. Opcjonalny `VITE_API_BASE_URL` działa w czasie budowania frontendu; standardowo pozostaw `/api`.
+
+## Powiadomienia i scheduler
+
+Po zatwierdzeniu wypożyczenia zdarzenie w pamięci procesu uruchamia asynchroniczny zapis `LOAN_BORROWED`. Własne wpisy są pod `GET /api/notifications/me` i w interfejsie. Nagłe zatrzymanie między transakcją a obsługą zdarzenia może zgubić potwierdzenie; brak trwałej kolejki.
+
+Scheduler działa na starcie i codziennie o **9:00 strefy procesu**, w Dockerze Europe/Warsaw. Tworzy `LOAN_OVERDUE_REMINDER` dla ACTIVE z `dueAt < teraz`. Unikalność `(loanId,type)` i `skipDuplicates` oznacza **jedno przypomnienie danego typu na wypożyczenie**, nie codzienne duplikaty. Lista jest odświeżana na żądanie; brak e-maili, WebSocketów i oznaczania jako przeczytane.
+
+## Testy
+
+Przed buildem backendu zatrzymaj jego lokalny watcher (`dev.cmd stop`), ponieważ oba używają katalogu `dist`. Po kontrolach przywróć development przez `dev.cmd`. Testy można też wykonywać obok pełnego Compose, którego pliki wynikowe są odizolowane w kontenerach.
+
+Wymagane lokalne zależności obu pakietów (`npm.cmd ci` w każdym) i wygenerowany Prisma Client. Z katalogu głównego:
+
+```powershell
+Set-Location backend
+npm.cmd run build
+npm.cmd run lint
+npm.cmd test
+npm.cmd run test:e2e
+Set-Location ../frontend
+npm.cmd run build
+npm.cmd run lint
+npm.cmd test
+Set-Location ..
+```
+
+`test:e2e` sprawdza HTTP, walidację i uprawnienia z atrapą Prisma. `test:db` wymaga **osobnej bazy testowej**, migracji i jawnego `TEST_DATABASE_URL`; [instrukcja](backend/README.md#testy-postgresql). Nigdy nie wskazuj bazy aplikacji. Zestaw obejmuje trwały zapis, wyścigi, indeksy i deduplikację powiadomień. Wyniki i liczbę zaliczonych testów wypisują uruchomione polecenia.
+
+## Dokumentacja i kod źródłowy
+
+- [Backend: endpointy API, model danych i testy PostgreSQL](backend/README.md)
+- [Frontend: widoki i zachowanie interfejsu](frontend/README.md)
+- [Schemat Prisma: sześć powiązanych encji](backend/prisma/schema.prisma)
+- [Migracje PostgreSQL, w tym częściowe indeksy unikalne](backend/prisma/migrations)
+- [Konfiguracja Docker Compose](compose.yaml)
+
+Pełne schematy żądań, odpowiedzi i błędów są dostępne w Swaggerze uruchomionej aplikacji pod `/api/docs`.

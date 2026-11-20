@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ) => {
       if (!session) {
         logout();
-        throw new ApiError("Sesja wygasła. Zaloguj się ponownie.", 401);
+        throw new ApiError("Zaloguj się, aby kontynuować.", 401);
       }
       try {
         return await apiRequest<T>(path, { ...options, token: session.token });

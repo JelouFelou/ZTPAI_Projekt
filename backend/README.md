@@ -1,162 +1,140 @@
 # BoardRent backend
 
-REST API aplikacji BoardRent zbudowane w NestJS i TypeScript.
+NestJS REST API z PostgreSQL i Prisma. Pełny opis funkcji, ról, reguł i konfiguracji Compose: [README projektu](../README.md). Poniżej opis endpointów, modelu danych i testów. Pełny kontrakt HTTP z przykładami pól i odpowiedzi jest dostępny w Swaggerze uruchomionej aplikacji.
 
-## Uruchomienie
+## Praca lokalna
 
-Z katalogu `backend` skopiuj przykładową konfigurację i ustaw własny sekret JWT:
+Wymagany Node.js 22.18+ lub 24, npm i działający PostgreSQL 17. W katalogu głównym skopiuj `backend/.env.example` do nieśledzonego `backend/.env`, jeśli jeszcze nie istnieje. Ustaw `DATABASE_URL` i własny losowy `AUTH_JWT_SECRET` (minimum 32 bajty). Nie nadpisuj istniejącej konfiguracji.
+
+Jeśli chcesz użyć bazy z Compose, wykonaj najpierw w katalogu głównym:
+
+```powershell
+docker compose --env-file backend/.env up -d db --wait
+```
+
+Przy własnym PostgreSQL pomiń ten krok. `DATABASE_URL` musi odpowiadać rzeczywistemu użytkownikowi, hasłu, nazwie bazy i portowi hosta. Do równoczesnego uruchomienia lokalnego API port 3000 musi być wolny; zatrzymaj backend z pełnego Compose, jeśli wcześniej go uruchomiono.
+
+Z katalogu `backend`:
 
 ```powershell
 npm.cmd ci
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
-[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-```
-
-Wstaw wygenerowany ciąg jako `AUTH_JWT_SECRET` w `backend/.env`, a następnie uruchom PostgreSQL i API:
-
-```powershell
-Set-Location ..
-Set-Location backend
 npm.cmd run db:generate
-npm.cmd run db:migrate
+npm.cmd run db:deploy
+$env:TZ = 'Europe/Warsaw'
 npm.cmd run start:dev
 ```
 
-Jeśli nie masz uruchomionego PostgreSQL na porcie `5432`, przed migracjami wykonaj w katalogu głównym `docker compose up -d db`. Przy istniejącej bazie pomiń ten krok i ustaw odpowiedni `DATABASE_URL` w `.env`.
+`db:deploy` stosuje istniejące migracje bez tworzenia nowych. `db:migrate` służy pracy nad nowymi zmianami schematu; nie jest wymagane do zwykłego uruchomienia. `db push` nie odtwarza częściowych indeksów SQL. API: http://localhost:3000/api, Swagger: http://localhost:3000/api/docs, OpenAPI: `/api/docs-json` i `/api/docs-yaml`. Opcjonalna zmienna PORT zmienia port (domyślnie 3000).
 
-API domyślnie nasłuchuje na porcie `3000`; można go zmienić zmienną `PORT`. Aplikacja nie uruchomi się z pustym lub krótszym niż 32 bajty sekretem. Wartości w `.env.example` są przeznaczone wyłącznie do lokalnego developmentu.
+## Skrypty i struktura
 
-Całą aplikację wraz z frontendem i bazą danych można uruchomić z katalogu głównego poleceniem `docker compose --env-file backend/.env up --build`. Compose czeka na gotowość PostgreSQL, stosuje migracje przed uruchomieniem API i zachowuje dane bazy w wolumenie `boardrent-postgres-data`.
+| Skrypt npm | Zadanie |
+| --- | --- |
+| start:dev / start:debug | Obserwowanie plików / debugger. |
+| build / start:prod | Kompilacja / uruchomienie `dist/main.js`. |
+| db:generate | Generowanie Prisma Client. |
+| db:deploy / db:migrate | Stosowanie migracji / praca nad nowymi migracjami. |
+| db:seed-demo | 14 fikcyjnych gier i kopie; uzupełnia brakujące poradniki, nie dubluje istniejących wpisów. |
+| db:create-admin | Nowy ADMIN z lokalnych zmiennych ADMIN_*. |
+| test / test:e2e / test:db | Jednostkowe / HTTP z atrapą bazy / prawdziwy PostgreSQL. |
+| lint | Analiza kodu, również typów. |
 
-Po migracjach możesz dodać 14 przykładowych gier i egzemplarze dla widoku katalogu: `npm.cmd run db:seed-demo`. Skrypt można uruchomić ponownie; nie zmienia istniejących wpisów. To dane demonstracyjne do pracy lokalnej.
-
-## Dostępne skrypty
-
-- `npm run start` — uruchomienie aplikacji
-- `npm run start:dev` — uruchomienie z obserwowaniem zmian
-- `npm run start:debug` — uruchomienie w trybie debugowania
-- `npm run build` — kompilacja aplikacji
-- `npm run start:prod` — uruchomienie skompilowanej aplikacji
-- `npm run db:generate` — generowanie Prisma Client
-- `npm run db:migrate` — utworzenie i zastosowanie migracji developerskiej
-- `npm run db:deploy` — zastosowanie przygotowanych migracji
-- `npm test` — testy jednostkowe
-- `npm run test:e2e` — testy end-to-end
-
-## Struktura
-
-- `src/main.ts` — punkt startowy serwera
-- `src/app.module.ts` — główny moduł NestJS
-- `src/auth/` — rejestracja, logowanie i weryfikacja JWT
-- `src/categories/`, `src/games/`, `src/game-copies/` — moduły katalogu
-- `src/common/` — konfiguracja API, obsługa błędów i request ID
-- `src/prisma/` — moduł i serwis dostępu do bazy
-- `prisma/schema.prisma` — schemat danych
-- `prisma/migrations/` — migracje PostgreSQL
-- `test/` — testy end-to-end
-
-## API
-
-Rejestracja konta `USER` przyjmuje hasło o długości **8–128 znaków** (`RegisterDto`, formularz React, schemat OpenAPI). Skrypt `scripts/create-admin.mjs` wymaga **12–128 znaków** dla `ADMIN`. Obie ścieżki zapisują wyłącznie hash Argon2id. Logowanie nie narzuca ponownie minimalnej długości i nie zmienia dotychczasowych haseł.
-
-Wszystkie endpointy są dostępne pod prefiksem `/api`.
-
-### Uwierzytelnianie
-
-- `POST /api/auth/register` — tworzy konto z rolą `USER`; pola: `email`, `password`, `firstName`, `lastName`
-- `POST /api/auth/login` — weryfikuje hasło i wydaje token JWT Bearer bez limitu czasu ważności (`expiresIn: null`)
-- `GET /api/auth/verify` — weryfikuje token przekazany w nagłówku `Authorization: Bearer <token>`
-- `GET /api/auth/me` — zwraca profil zalogowanego użytkownika; wymaga tokenu `Bearer`
-
-Hasła są haszowane Argon2id. E-mail jest przy rejestracji normalizowany do małych liter. Hasło użytkownika USER musi mieć 8–128 znaków. Rejestracja nie przyjmuje roli od klienta i nie zwraca hasła ani jego hashu. Błędne dane logowania zwracają ten sam komunikat `401`; dla nieistniejącego konta wykonywana jest również weryfikacja Argon2id, aby ograniczyć różnice czasu odpowiedzi. Sekret JWT musi być unikalny, przechowywany poza repozytorium i mieć co najmniej 32 bajty.
-
-### Katalog
-
-- `/api/categories` — `GET`, `POST`, `GET /:id`, `PATCH /:id`, `DELETE /:id`
-- `/api/games` — `GET`, `POST`, `GET /:id`, `PATCH /:id`, `DELETE /:id`
-- `/api/game-copies` — `GET`, `POST`, `GET /:id`, `PATCH /:id`, `DELETE /:id`
-
-Listę gier można wyszukiwać i filtrować: `GET /api/games?q=catan&categoryId=<uuid>&page=1&limit=20`. `q` przeszukuje tytuł i opis bez rozróżniania wielkości liter. Paginacja domyślnie używa `page=1` i `limit=20`, a maksymalny limit to 100. Wynik zawiera `data` i `pagination` (`page`, `limit`, `total`, `totalPages`).
-
-Odczyt katalogu (`GET`) jest publiczny. Tworzenie, aktualizowanie i usuwanie kategorii, gier oraz egzemplarzy wymaga tokenu JWT użytkownika z rolą `ADMIN`. Konto rejestrowane przez publiczny endpoint otrzymuje rolę `USER`; nie można ustawić roli w żądaniu rejestracji. Rola i konto są sprawdzane w bazie przy każdym chronionym żądaniu, więc token nie zachowuje uprawnień po zmianie roli ani usunięciu konta. Brak lub nieprawidłowy token zwraca `401`, a poprawny token użytkownika bez wymaganej roli zwraca `403`.
-
-### Wypożyczenia
-
-- `POST /api/loans` — wypożycza egzemplarz, przyjmuje `{ "gameCopyId": "<uuid>" }` i wymaga tokenu JWT; użytkownik jest ustalany na podstawie tokenu
-- `GET /api/loans/me` — historia zalogowanego użytkownika; tożsamość pochodzi wyłącznie z tokenu, parametr `userId` jest odrzucany
-- `GET /api/loans` — historia wszystkich użytkowników, wymaga roli `ADMIN`; opcjonalny filtr `userId=<uuid>`
-- `PATCH /api/loans/:id/return` — zwraca własne aktywne wypożyczenie; wymaga tokenu JWT i UUID wypożyczenia, bez body. Zwraca `200` z wypożyczeniem w statusie `RETURNED` i datą `returnedAt` ustaloną przez serwer. Nie zmienia `borrowedAt` ani `dueAt`.
-
-Wypożyczenie trwa 14 dni. Użytkownik może mieć jedno aktywne wypożyczenie; zaległe wypożyczenie blokuje kolejne. Publiczny `GET /api/loans/policy` zwraca `{ durationDays: 14, maxActiveLoans: 1 }` ze wspólnych stałych używanych przez serwis. Frontend pokazuje podsumowanie i wymaga świadomego potwierdzenia przed `POST /api/loans`. Zapis od razu tworzy aktywne wypożyczenie; bez osobnego etapu rezerwacji lub akceptacji administratora. Egzemplarz musi mieć status `AVAILABLE` i nie może mieć aktywnego wypożyczenia. Brak egzemplarza zwraca `404`, a naruszenie reguł biznesowych `409`. Zwracany rekord zawiera termin zwrotu oraz podstawowe informacje o egzemplarzu i grze.
-
-Zwrot nieistniejącego lub cudzego wypożyczenia zwraca `404` (również dla administratora); ponowny zwrot zwraca `409` i zachowuje pierwotną datę zwrotu. Brak tokenu zwraca `401`, a niepoprawny UUID — `400`. Zwrot jest transakcyjny: przy dwóch równoczesnych żądaniach tylko jedno może się powieść. Można zwrócić także zaległą grę. Zwrot zwalnia limit użytkownika i przywraca dostępność egzemplarza tylko wtedy, gdy jego status to `AVAILABLE`; nie zmienia `MAINTENANCE` ani `RETIRED`.
-
-Historia domyślnie obejmuje statusy `ACTIVE` i `RETURNED`. Oba endpointy listowania przyjmują `status=ACTIVE|RETURNED`, `page` (domyślnie 1, maksymalnie 1000000) i `limit` (domyślnie 20, maksymalnie 100). Tylko lista administratora przyjmuje dodatkowo `overdue=true|false`: `true` oznacza aktywne wypożyczenia z `dueAt` wcześniejszym niż chwila zapytania, a `false` — aktywne wypożyczenia jeszcze w terminie. Tego filtra nie można łączyć z `status=RETURNED`. Przeterminowanie jest wyliczane z daty, bez nowego statusu w bazie. Odpowiedź ma format `{ data: [...], pagination: { page, limit, total, totalPages } }`. Sortowanie: `borrowedAt DESC`, a przy jednakowych datach `id DESC`. Pusta historia ma `totalPages=0`; strona poza zakresem zwraca pustą listę z rzeczywistą liczbą wyników. Lista i licznik są pobierane z jednego obrazu danych w transakcji `RepeatableRead`.
-
-### Zdarzenia i przypomnienia
-
-
-Wpis zawiera daty, status i informacje o egzemplarzu oraz grze. Widok administratora dodaje pole `user` z `id`, `email`, `firstName` i `lastName`, bez hasła i jego hashu. Zwykły użytkownik otrzymuje `403` dla `GET /api/loans`; brak tokenu na obu endpointach zwraca `401`. Niepoprawne filtry i nieznane parametry zwracają `400`. Przykłady: `GET /api/loans/me?status=RETURNED&page=1&limit=10`, `GET /api/loans?status=ACTIVE&userId=<uuid>`.
-
-Żądania z body i parametry zapytań są walidowane; nieznane pola zwracają `400`. ID w ścieżkach muszą być UUID. Każda odpowiedź z błędem ma format `{ "error": { "code", "message", "details?", "requestId" } }`; `requestId` jest również zwracany w nagłówku `X-Request-Id`. Nieoczekiwane błędy są logowane po stronie serwera, bez ujawniania szczegółów klientowi. Usunięcie zasobu używanego przez inne rekordy zwraca `409 Conflict`.
-
-
-### Powiadomienia użytkownika
-
-`GET /api/notifications/me?page=1&limit=20` wymaga tokenu JWT i zwraca tylko własne powiadomienia (`USER` i `ADMIN`), od najnowszych: `{ data: [{ id, type, message, createdAt }], pagination: { page, limit, total, totalPages } }`. `page`: 1–1000000, `limit`: 1–100; wartości domyślne to 1 i 20. Nieznane parametry, również `userId`, są odrzucane (`400`). Brak lub nieprawidłowy token albo nieistniejące konto daje `401`. Lista i licznik są pobierane w jednej transakcji `RepeatableRead`. Starsze anglojęzyczne komunikaty są lokalizowane przy odczycie na podstawie powiązanego własnego wypożyczenia, bez nadpisywania historii.
-
-Zdarzenie `LOAN_BORROWED` zapisuje potwierdzenie asynchronicznie po zatwierdzeniu wypożyczenia. Scheduler przy uruchomieniu i codziennie o 9:00 w strefie procesu zapisuje przypomnienia `LOAN_OVERDUE_REMINDER` o zaległych aktywnych wypożyczeniach. Docker ustawia `Europe/Warsaw`; przy uruchomieniu bez Dockera należy ustawić tę strefę procesu, jeśli harmonogram ma działać według czasu polskiego. Istniejące ograniczenie unikalne `(loanId, type)` i `createMany(skipDuplicates: true)` chronią przed powtórzeniami także przy równoczesnym uruchomieniu. Komunikaty i daty są prezentowane po polsku, terminy w `Europe/Warsaw`. Brak poczty, WebSocketów i oznaczania jako przeczytane. Zdarzenia są w pamięci procesu — wyłączenie go między zapisem wypożyczenia a obsługą zdarzenia może zgubić potwierdzenie; nie zmieniono tej architektury.
-
-### Swagger
-
-Swagger UI jest dostępne pod `http://localhost:3000/api/docs`; surowy dokument OpenAPI pod `http://localhost:3000/api/docs-json`.
+`src/main.ts` i `app.module.ts`: start aplikacji; `common/`: konfiguracja API, Swagger, walidacja, błędy i request ID; `auth/`: JWT, Argon2id i role; `categories/`, `games/`, `game-copies/`: katalog; `loans/`: transakcyjna logika wypożyczania i zwrotów; `notifications/`: zdarzenia i scheduler; `prisma/`: serwis bazy; `prisma/schema.prisma` i migracje: model i SQL; `test/`: testy HTTP oraz integracyjne PostgreSQL.
 
 ## Administrator
 
-Po migracjach ustaw lokalnie w `backend/.env` wartości `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12–128 znaków), `ADMIN_FIRST_NAME` i `ADMIN_LAST_NAME` (1–100 znaków). Następnie w katalogu `backend` uruchom:
+Po migracjach dodaj do lokalnego `backend/.env` ADMIN_EMAIL, ADMIN_PASSWORD (12–128 znaków), ADMIN_FIRST_NAME i ADMIN_LAST_NAME (1–100 znaków). W `backend` uruchom `npm.cmd run db:create-admin`. Istniejącego konta skrypt nie zmienia i nie nadaje mu nowej roli. Usuń potem ADMIN_PASSWORD z pliku. Nie publikuj danych logowania.
+
+Publiczna rejestracja przyjmuje hasło 8–128 znaków i tworzy USER. Oba rodzaje haseł używają Argon2id. JWT nowych sesji nie ma limitu czasowego. Konto i rola są ponownie sprawdzane w bazie przy chronionym żądaniu.
+
+## REST API
+
+Wszystkie poniższe ścieżki mają prefiks `/api`. JSON wysyłaj z `Content-Type: application/json`. Chronione operacje wymagają `Authorization: Bearer <accessToken>`; token otrzymasz przez logowanie. W Swaggerze użyj Authorize i wklej sam token. JWT oznacza dostęp USER i ADMIN, a ADMIN wymaga tej roli.
+
+| Endpoint | Dostęp i wynik |
+| --- | --- |
+| `POST /auth/register` | Publiczny; email, password, firstName, lastName; 201 z profilem USER. Rola przesłana przez klienta jest odrzucana. |
+| `POST /auth/login` | Publiczny; email i password; 200 z accessToken, tokenType Bearer, expiresIn null i profilem. |
+| `GET /auth/me`, `GET /auth/verify` | JWT; własny profil albo potwierdzenie ważności tokenu. |
+| `GET /categories`, `GET /categories/:id` | Publiczny; tablica kategorii albo pojedyncza kategoria. |
+| `GET /games`, `GET /games/:id` | Publiczny; stronicowana lista albo gra z kategorią, dostępnością i planowanymi zwrotami. |
+| `GET /game-copies`, `GET /game-copies/:id` | Publiczny; tablica albo pojedynczy fizyczny egzemplarz z wyliczoną dostępnością. |
+| `POST`, `PATCH /:id`, `DELETE /:id` dla categories/games/game-copies | ADMIN; odpowiednio 201, 200 i 204. POST wykonuje się na ścieżce kolekcji, bez ID. |
+| `GET /loans/policy` | Publiczny; durationDays 14, maxActiveLoans 1. |
+| `POST /loans` | JWT; body zawiera tylko gameCopyId; 201 z nowym własnym ACTIVE i terminem zwrotu. |
+| `GET /loans/me` | JWT; własne wypożyczenia z paginacją. |
+| `GET /loans` | ADMIN; historia wszystkich z podstawowymi danymi wypożyczającego. |
+| `PATCH /loans/:id/return` | JWT i właściciel wypożyczenia; bez body; 200 z RETURNED i datą zwrotu. |
+| `GET /notifications/me` | JWT; wyłącznie własne powiadomienia z paginacją. |
+
+Publiczny `GET /api` zwraca tekst `Hello World!`; potwierdza działanie HTTP, nie połączenie z bazą. Katalog sprawdzisz przez `GET /api/games?limit=1`. Swagger: `/api/docs`, OpenAPI JSON: `/api/docs-json`, YAML: `/api/docs-yaml`.
+
+Gry przyjmują `q` (tytuł lub opis, bez rozróżniania wielkości liter, do 200 znaków) i `categoryId` (UUID). Gry, wypożyczenia i powiadomienia przyjmują `page` 1–1000000 oraz `limit` 1–100, domyślnie 1 i 20. Odpowiedź: `{ data: [...], pagination: { page, limit, total, totalPages } }`. Kategorie i egzemplarze zwracają zwykłe tablice.
+
+Historia obsługuje `status=ACTIVE|RETURNED`; lista ADMIN dodatkowo `userId` i `overdue=true|false`. `true` wybiera aktywne po terminie, `false` aktywne jeszcze w terminie. Filtra overdue nie można łączyć ze statusem RETURNED. Własna historia i powiadomienia nie przyjmują userId. Przykłady: `/api/games?q=szach&page=1&limit=20`, `/api/loans/me?status=RETURNED`, `/api/loans?overdue=true`.
+
+UUID, body i parametry z DTO są walidowane; nieznane pola DTO są odrzucane. Błędy mają format `{ error: { code, message, details?, requestId } }` i nagłówek X-Request-Id. Najważniejsze statusy: 400 — walidacja, 401 — brak lub nieprawidłowe uwierzytelnienie, 403 — brak roli, 404 — brak zasobu lub cudze wypożyczenie przy zwrocie, 409 — konflikt reguł/unikalności/relacji, 500 — błąd wewnętrzny, 503 — niedostępność rozpoczęcia transakcji. Odpowiedzi 5xx ukrywają szczegóły błędu. Dane kont nie zawierają hasła ani jego hashu. API nie ma endpointu logout ani odświeżania tokenu.
+
+## Model danych
+
+[Schemat Prisma](prisma/schema.prisma) definiuje sześć encji:
+
+- User — konto USER/ADMIN; unikalny e-mail i hash hasła.
+- Category — kategoria o unikalnej nazwie; zawiera wiele gier.
+- Game — tytuł, opis, parametry rozgrywki i poradnik; należy do jednej kategorii i ma wiele egzemplarzy.
+- GameCopy — fizyczny egzemplarz z unikalnym inventoryCode i statusem AVAILABLE/MAINTENANCE/RETIRED; należy do jednej gry.
+- Loan — powiązanie użytkownika z egzemplarzem, status ACTIVE/RETURNED oraz daty odbioru, terminu i oddania. Użytkownik i kopia mogą mieć wiele wpisów historycznych.
+- Notification — wiadomość należąca do jednego użytkownika i jednego wypożyczenia; unikalna para (loanId,type).
+
+Klucze główne i obce są UUID, daty mają typ timestamptz(3). FK z Restrict chronią przed usunięciem używanych rekordów. [Migracje](prisma/migrations) dodają również dwa częściowe indeksy UNIQUE na loans(user_id) i loans(game_copy_id), oba tylko WHERE status = 'ACTIVE'. Nie są odwzorowane jako unikalności modeli Prisma; dlatego stosuj pełne migracje. Liczby dostępnych/wypożyczonych kopii i planowane zwroty są wyliczane, nie są dodatkowymi tabelami.
+
+## Wypożyczenia, zdarzenia i przypomnienia
+
+Jedno ACTIVE na użytkownika, okres 14 dni. Odbiór od razu zapisuje ACTIVE, bez rezerwacji i zatwierdzania przez administratora. Zwrot tylko własnego wypożyczenia, również dla ADMIN. Serializable z maksymalnie trzema próbami i częściowe indeksy chronią limit i dostępność; RepeatableRead zapewnia spójny licznik i strony historii/powiadomień. Ponowny zwrot daje 409; zmiana gry egzemplarza z historią również daje 409. Dokładne reguły opisano w [README projektu](../README.md#reguły-biznesowe).
+
+Po zatwierdzeniu transakcji zdarzenie LOAN_BORROWED uruchamia asynchroniczny zapis potwierdzenia. Zdarzenia są w pamięci procesu: awaria pomiędzy zapisem wypożyczenia a listenerem może zgubić potwierdzenie. Błąd listenera jest logowany; nie cofa zatwierdzonego wypożyczenia.
+
+Scheduler sprawdza ACTIVE z dueAt < teraz na starcie i codziennie o 9:00 **w strefie procesu**. Kontener ustawia Europe/Warsaw; dla ręcznego uruchomienia ustaw TZ przed startem. Tworzy LOAN_OVERDUE_REMINDER, a UNIQUE(loanId,type) i createMany(skipDuplicates) zapobiegają duplikatom nawet przy równoległych przebiegach. To jedno przypomnienie danego typu na wypożyczenie, nie nowy wpis codziennie.
+
+`GET /api/notifications/me` udostępnia własne wpisy USER i ADMIN, z paginacją. Starsze angielskie wiadomości są lokalizowane przy odczycie na podstawie własnego wypożyczenia. Brak e-maili, WebSocketów oraz stanu przeczytania.
+
+## Testy
+
+Przed buildem zatrzymaj lokalny watcher API (`dev.cmd stop` z katalogu głównego), ponieważ korzysta z tego samego `dist`. Po kontrolach możesz ponownie uruchomić `dev.cmd`.
+
+W katalogu `backend`:
 
 ```powershell
-npm.cmd run db:create-admin
+npm.cmd run build
+npm.cmd run lint
+npm.cmd test
+npm.cmd run test:e2e
 ```
 
-Skrypt tworzy konto `ADMIN` z hasłem haszowanym Argon2id. Istniejącego konta nie zmienia ani nie podnosi jego uprawnień. Po utworzeniu usuń hasło administratora z `.env`; logowanie działa przez zwykły endpoint. Nie dodawaj `.env` do repozytorium.
+Zestaw HTTP używa atrapy Prisma — nie jest dowodem zachowania prawdziwych transakcji. Testy jednostkowe sprawdzają również scheduler i obsługę zdarzeń.
 
-## Spójność i dostępność
+## Testy PostgreSQL
 
-- `GameCopy.status` opisuje stan egzemplarza. `isAvailable` jest prawdziwe tylko przy `AVAILABLE` i braku aktywnego wypożyczenia. Gry zwracają liczbę takich egzemplarzy jako `availableCopies`.
-- Odpowiedzi gier zawierają również `borrowedCopies` i `expectedReturns`: numery egzemplarzy oraz `dueAt` ich aktywnych wypożyczeń, posortowane od najwcześniejszego terminu. Dane wypożyczających nie trafiają do publicznego katalogu. Planowany zwrot nie gwarantuje dostępności; daty po terminie są nadal zwracane. W interfejsie `borrowedAt` oznacza potwierdzenie odbioru, a `returnedAt` potwierdzenie oddania.
-- Zmiana `gameId` egzemplarza z historią wypożyczeń zwraca `409`, również po zwrocie. Edycja pozostałych pól nadal jest możliwa.
-- Sprawdzenia i zapis wypożyczenia odbywają się w transakcji `Serializable`. Konflikty serializacji powodują ponowienie całej operacji, maksymalnie trzy próby; nierozstrzygnięty konflikt zwraca `409`.
-- Przekroczenie czasu oczekiwania na rozpoczęcie transakcji również pozwala na ponowienie w ramach tych trzech prób. Jeżeli nadal nie można rozpocząć transakcji, API zwraca `503`. Inne błędy `P2028` powstałe już wewnątrz transakcji nie są ponawiane.
-- Migracja `20261108220000_unique_active_copy_loan` dodaje częściowy indeks unikalny dla aktywnego wypożyczenia egzemplarza. Prisma nie odwzorowuje go w schemacie — bazę przygotowuj migracjami, nie samym `db push`. Jeśli baza ma już podwójne aktywne wypożyczenia, migracja odmówi ich zaakceptowania; najpierw rozstrzygnij te rekordy.
-- Migracja `20261110220000_unique_active_user_loan` dodaje analogiczny indeks dla użytkownika. Baza pilnuje więc limitu jednego aktywnego wypożyczenia również przy zapisach poza serwisem. Zmiana limitu na więcej niż jedno wymaga najpierw zmiany tego indeksu w nowej migracji. Jeśli w bazie istnieją już wielokrotne aktywne wypożyczenia użytkownika, trzeba je rozstrzygnąć przed migracją.
-- Limit wynosi jedno aktywne wypożyczenie na użytkownika. To aktualne założenie, zmienione względem roboczego planu przewidującego trzy.
-
-## Weryfikacja
-
-Opis czterech niezależnych reguł biznesowych, miejsc ich realizacji i ochrony transakcyjnej znajduje się w [głównym README](../README.md#reguły-biznesowe). Kontrola zaległego wypożyczenia nie stanowi osobnej reguły niezależnej od limitu jednej aktywnej gry. W kodzie sprawdzono limit użytkownika, dostępność egzemplarza, blokadę ponownego zwrotu i blokadę zmiany gry dla egzemplarza z historią; wszystkie cztery są egzekwowane przez API.
+Utwórz **oddzielną, pustą bazę** `boardrent_test` (np. przez psql lub administratora PostgreSQL). Dla domyślnej lokalnej konfiguracji Compose, z katalogu głównego:
 
 ```powershell
-npm test
-npm run test:e2e
-npm run build
-npm run lint
+docker compose --env-file backend/.env exec db psql -U boardrent -d postgres -c "CREATE DATABASE boardrent_test;"
 ```
 
-`test:e2e` sprawdza HTTP, walidację i uprawnienia z atrapą Prisma; nie testuje PostgreSQL. Osobny zestaw `test:db` sprawdza trwały zapis, dostępność, ochronę historii, indeks unikalny oraz równoczesne wypożyczenia przez rzeczywistą bazę.
-
-Przygotuj **osobną bazę testową**, np. `boardrent_test`, i zastosuj w niej migracje. W PowerShell, z katalogu `backend`:
+Przy innym POSTGRES_USER dostosuj nazwę użytkownika. Jeśli baza testowa już istnieje, pomiń CREATE DATABASE po upewnieniu się, że to osobna baza przeznaczona na testy. Nie używaj istniejącej bazy aplikacji; nie usuwaj jej danych. Następnie w katalogu `backend` ustaw TEST_DATABASE_URL na URL nowej bazy. Poniższy URL odpowiada wyłącznie publicznym, lokalnym ustawieniom `.env.example`; przy własnej konfiguracji dostosuj dane i zakoduj znaki specjalne hasła w URL:
 
 ```powershell
 $env:TEST_DATABASE_URL = 'postgresql://boardrent:boardrent-local@localhost:5432/boardrent_test?schema=public'
+if (!$env:TEST_DATABASE_URL) { throw 'Ustaw URL osobnej bazy testowej' }
 $previousDatabaseUrl = $env:DATABASE_URL
 try {
   $env:DATABASE_URL = $env:TEST_DATABASE_URL
-  npm run db:deploy
+  npm.cmd run db:deploy
+  if ($LASTEXITCODE -ne 0) { throw 'Migracje bazy testowej nie powiodły się' }
 } finally {
   $env:DATABASE_URL = $previousDatabaseUrl
 }
-npm run test:db
+npm.cmd run test:db
 ```
 
-Testy tworzą własne rekordy z losowymi identyfikatorami i usuwają je po każdym przypadku. Brak `TEST_DATABASE_URL` kończy zestaw błędem; testy nie użyją automatycznie bazy aplikacji.
+Testy wymagają jawnego TEST_DATABASE_URL i nie przechodzą automatycznie na DATABASE_URL. Odpowiedzialność za wskazanie osobnej bazy pozostaje po stronie uruchamiającego. Tworzą własne rekordy i sprzątają je po przypadkach; obejmują równoczesne wypożyczenia/zwroty, ochronę historii, indeksy, powiadomienia i walidację administratora. Wyniki wypisuje Vitest. Instrukcja nie wymaga czyszczenia ani usuwania bazy aplikacji.

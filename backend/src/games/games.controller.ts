@@ -102,6 +102,7 @@ export class GamesController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update a game' })
   @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: GameResponseDto })
   @ApiBadRequestResponse({ type: ApiErrorEnvelopeDto })
   @ApiNotFoundResponse({ type: ApiErrorEnvelopeDto })
   @ApiConflictResponse({ type: ApiErrorEnvelopeDto })

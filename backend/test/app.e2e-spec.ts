@@ -1037,6 +1037,18 @@ describe('BoardRent API (e2e)', () => {
       .expect(200);
 
     expect(response.body.info.title).toBe('BoardRent API');
+    for (const [resource, dto] of [
+      ['categories', 'CategoryResponseDto'],
+      ['games', 'GameResponseDto'],
+      ['game-copies', 'GameCopyResponseDto'],
+    ]) {
+      for (const method of ['get', 'patch']) {
+        expect(
+          response.body.paths[`/api/${resource}/{id}`][method].responses['200']
+            .content['application/json'].schema,
+        ).toEqual({ $ref: `#/components/schemas/${dto}` });
+      }
+    }
     const gamesPath = Object.keys(response.body.paths).find((path) =>
       path.endsWith('/games'),
     );
@@ -1097,6 +1109,7 @@ describe('BoardRent API (e2e)', () => {
       'access-token': [],
     });
     expect(response.body.paths[loansPath].post.responses['409']).toBeDefined();
+    expect(response.body.paths[loansPath].post.responses['503']).toBeDefined();
     const adminHistory = response.body.paths[loansPath].get;
     const myHistory = response.body.paths[`${loansPath}/me`].get;
     expect(adminHistory.responses['403']).toBeDefined();

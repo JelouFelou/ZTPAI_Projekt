@@ -118,6 +118,7 @@ export class LoansController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Borrow an available game copy' })
   @ApiCreatedResponse({ type: LoanResponseDto })
+  @ApiServiceUnavailableResponse({ type: ApiErrorEnvelopeDto })
   @ApiBadRequestResponse({ type: ApiErrorEnvelopeDto })
   @ApiConflictResponse({
     type: ApiErrorEnvelopeDto,
