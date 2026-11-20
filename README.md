@@ -225,6 +225,13 @@ Set-Location ..
 
 `test:e2e` sprawdza HTTP, walidację i uprawnienia z atrapą Prisma. `test:db` wymaga **osobnej bazy testowej**, migracji i jawnego `TEST_DATABASE_URL`; [instrukcja](backend/README.md#testy-postgresql). Nigdy nie wskazuj bazy aplikacji. Zestaw obejmuje trwały zapis, wyścigi, indeksy i deduplikację powiadomień. Wyniki i liczbę zaliczonych testów wypisują uruchomione polecenia.
 
+## Demonstracja projektu
+
+Nagranie przedstawiające działanie aplikacji BoardRent
+z perspektywy użytkownika.
+
+🎬 [Obejrzyj demonstrację projektu](https://youtu.be/IWVVRlEzPUE)
+
 ## Dokumentacja i kod źródłowy
 
 - [Backend: endpointy API, model danych i testy PostgreSQL](backend/README.md)
